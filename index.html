@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction Analysis</title>
+    <link rel="stylesheet" href="styles.css?v=2">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Transaction Count Analyzer</h1>
+            <p>Upload your transaction spreadsheet to analyze counts and totals</p>
+        </header>
+
+        <main>
+            <!-- File Upload Section -->
+            <section class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-content">
+                        <div class="upload-icon">📊</div>
+                        <h3>Drop your spreadsheet here</h3>
+                        <p>CSV or Excel files (.csv, .xlsx)</p>
+                        <p>or <span class="upload-link">click to browse</span></p>
+                        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" hidden>
+                    </div>
+                </div>
+                <div class="processing-indicator" id="processingIndicator" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Processing spreadsheet...</p>
+                </div>
+            </section>
+
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <h2>Transaction Analysis</h2>
+                
+                <!-- Summary Table -->
+                <div class="summary-section">
+                    <h3>Summary</h3>
+                    <table class="summary-table" id="summaryTable">
+                        <thead>
+                            <tr>
+                                <th>Transaction Type</th>
+                                <th>Count</th>
+                                <th>Total Amount</th>
+                                <th>Average Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryTableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Detailed Transactions Table -->
+                <div class="transactions-section">
+                    <h3>All Transactions</h3>
+                    <div class="table-controls">
+                        <input type="text" id="searchInput" placeholder="Search transactions..." class="search-input">
+                        <select id="typeFilter" class="type-filter">
+                            <option value="">All Types</option>
+                            <option value="checks">Checks</option>
+                            <option value="debits">Debits</option>
+                            <option value="credits">Credits</option>
+                        </select>
+                    </div>
+                    <table class="transactions-table" id="transactionsTable">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-column="date">Date</th>
+                                <th class="sortable" data-column="description">Description</th>
+                                <th class="sortable" data-column="amount">Amount</th>
+                                <th class="sortable" data-column="type">Type</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <button class="reset-btn" id="resetBtn">Analyze Another Statement</button>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js?v=4"></script>
+</body>
+</html>
