@@ -6,6 +6,7 @@
     <title>Transaction Analysis</title>
     <link rel="stylesheet" href="styles.css?v=2">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="test-fixtures.js"></script>
 </head>
 <body>
     <div class="container">
@@ -25,6 +26,11 @@
                         <p>or <span class="upload-link">click to browse</span></p>
                         <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" hidden>
                     </div>
+                </div>
+                <div class="test-section" style="margin-top: 20px; text-align: center;">
+                    <button id="runTestsBtn" class="test-button">🧪 Run Test Suite</button>
+                    <button id="runPerformanceBtn" class="test-button">⚡ Performance Test</button>
+                    <button id="generateSampleBtn" class="test-button">📄 Generate Sample Data</button>
                 </div>
                 <div class="processing-indicator" id="processingIndicator" style="display: none;">
                     <div class="spinner"></div>
@@ -85,6 +91,6 @@
         </main>
     </div>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=16"></script>
 </body>
 </html>

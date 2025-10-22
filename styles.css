@@ -121,6 +121,36 @@ header p {
 .upload-content h3 {
     font-size: 1.5rem;
     color: #2c3e50;
+}
+
+/* Test Section */
+.test-section {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.test-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    margin: 0 10px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.test-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.test-button:active {
+    transform: translateY(0);
+}
     margin-bottom: 10px;
 }
 
@@ -386,4 +416,51 @@ header p {
 
 .mb-20 {
     margin-bottom: 20px;
+}
+
+/* Error state styling */
+.error-section {
+    background: #fff5f5;
+    border: 1px solid #fed7d7;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+}
+
+.error-message h3 {
+    color: #e53e3e;
+    margin-bottom: 12px;
+    font-size: 18px;
+}
+
+.error-message p {
+    color: #4a5568;
+    margin-bottom: 20px;
+    font-size: 16px;
+}
+
+.error-details, .error-solutions {
+    margin: 16px 0;
+}
+
+.error-details h4, .error-solutions h4 {
+    color: #2d3748;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.error-details ul, .error-solutions ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.error-details li, .error-solutions li {
+    color: #4a5568;
+    margin: 4px 0;
+    font-size: 14px;
+}
+
+.error-solutions li {
+    color: #2b6cb0;
 }
