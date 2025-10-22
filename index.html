@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transaction Analysis</title>
-    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="styles.css?v=3">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="test-fixtures.js"></script>
+    <script src="test-fixtures.js?v=2"></script>
 </head>
 <body>
     <div class="container">
@@ -16,21 +16,134 @@
         </header>
 
         <main>
+            <!-- Preliminary Questions Section -->
+            <section class="preliminary-questions-section" id="preliminaryQuestionsSection">
+                <div class="preliminary-questions-form">
+                    <h2>Account Information</h2>
+                    <p>Please provide the following information about your account:</p>
+                    
+                    <div class="questions-container">
+                        <!-- Bank Name Question -->
+                        <div class="question-group">
+                            <label for="bankDropdown" class="question-label">1. What is the name of your bank?</label>
+                            <div class="bank-dropdown-container">
+                                <select id="bankDropdown" class="bank-dropdown">
+                                    <option value="">Choose your bank...</option>
+                                    <!-- Top Banks by Assets/Market Share -->
+                                    <option value="chase">Chase Bank</option>
+                                    <option value="bank-of-america">Bank of America</option>
+                                    <option value="wells-fargo">Wells Fargo</option>
+                                    <option value="citibank">Citibank</option>
+                                    <option value="us-bank">U.S. Bank</option>
+                                    <option value="pnc">PNC Bank</option>
+                                    <option value="capital-one">Capital One</option>
+                                    <option value="truist">Truist</option>
+                                    <option value="goldman-sachs">Goldman Sachs</option>
+                                    <option value="morgan-stanley">Morgan Stanley</option>
+                                    
+                                    <!-- Other Banks (Alphabetical) -->
+                                    <option value="ally">Ally Bank</option>
+                                    <option value="american-express">American Express</option>
+                                    <option value="associated">Associated Bank</option>
+                                    <option value="bancorpsouth">BancorpSouth</option>
+                                    <option value="bank-of-hawaii">Bank of Hawaii</option>
+                                    <option value="bank-of-the-west">Bank of the West</option>
+                                    <option value="bb&t">BB&T</option>
+                                    <option value="bmo-harris">BMO Harris Bank</option>
+                                    <option value="bok-financial">BOK Financial</option>
+                                    <option value="cathay">Cathay Bank</option>
+                                    <option value="charles-schwab">Charles Schwab</option>
+                                    <option value="citizens">Citizens Bank</option>
+                                    <option value="city-national">City National Bank</option>
+                                    <option value="comerica">Comerica Bank</option>
+                                    <option value="discover">Discover Bank</option>
+                                    <option value="east-west">East West Bank</option>
+                                    <option value="fidelity">Fidelity</option>
+                                    <option value="first-citizens">First Citizens Bank</option>
+                                    <option value="first-hawaiian">First Hawaiian Bank</option>
+                                    <option value="first-horizon">First Horizon Bank</option>
+                                    <option value="first-interstate">First Interstate Bank</option>
+                                    <option value="first-national">First National Bank</option>
+                                    <option value="flagstar">Flagstar Bank</option>
+                                    <option value="frost">Frost Bank</option>
+                                    <option value="hancock-whitney">Hancock Whitney</option>
+                                    <option value="hsbc">HSBC Bank</option>
+                                    <option value="huntington">Huntington Bank</option>
+                                    <option value="keybank">KeyBank</option>
+                                    <option value="m&t">M&T Bank</option>
+                                    <option value="new-york-community">New York Community Bank</option>
+                                    <option value="old-national">Old National Bank</option>
+                                    <option value="peoples-united">People's United Bank</option>
+                                    <option value="regions">Regions Bank</option>
+                                    <option value="santander">Santander Bank</option>
+                                    <option value="signature">Signature Bank</option>
+                                    <option value="silicon-valley">Silicon Valley Bank</option>
+                                    <option value="suntrust">SunTrust</option>
+                                    <option value="synchrony">Synchrony Bank</option>
+                                    <option value="td-bank">TD Bank</option>
+                                    <option value="tcf">TCF Bank</option>
+                                    <option value="umb">UMB Bank</option>
+                                    <option value="union-bank">Union Bank</option>
+                                    <option value="vanguard">Vanguard</option>
+                                    <option value="valley-national">Valley National Bank</option>
+                                    <option value="webster">Webster Bank</option>
+                                    <option value="zions">Zions Bank</option>
+                                    <option value="other">Other (Search for your bank)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="bank-search-container" id="bankSearchContainer" style="display: none;">
+                                <input type="text" id="bankSearchInput" class="bank-search-input" placeholder="Type to search for your bank...">
+                                <div class="bank-search-results" id="bankSearchResults"></div>
+                            </div>
+                        </div>
+
+                        <!-- Account Type Question -->
+                        <div class="question-group">
+                            <label for="accountTypeDropdown" class="question-label">2. What type of account is this?</label>
+                            <select id="accountTypeDropdown" class="account-type-dropdown">
+                                <option value="">Select account type...</option>
+                                <option value="checking">Checking Account</option>
+                                <option value="savings">Savings Account</option>
+                                <option value="credit-card">Credit Card</option>
+                            </select>
+                        </div>
+
+                        <!-- Last 4 Digits Question -->
+                        <div class="question-group">
+                            <label for="lastFourDigits" class="question-label">3. What are the last 4 digits of your account number?</label>
+                            <input type="text" id="lastFourDigits" class="last-four-input" placeholder="Enter last 4 digits" maxlength="4" pattern="[0-9]{4}">
+                            <small class="input-help">This helps us identify the correct account format for your bank.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="preliminary-questions-actions">
+                        <button id="continueToUploadBtn" class="continue-btn" disabled>Continue to Upload</button>
+                    </div>
+                </div>
+            </section>
+
             <!-- File Upload Section -->
-            <section class="upload-section">
+            <section class="upload-section" id="uploadSection" style="display: none;">
+                <div class="upload-actions" style="margin-bottom: 20px; text-align: center;">
+                    <button id="backToQuestionsBtn" class="back-btn">← Back to Account Info</button>
+                </div>
+                
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-content">
-                        <div class="upload-icon">📊</div>
+                        <div class="upload-icon"></div>
                         <h3>Drop your spreadsheet here</h3>
                         <p>CSV or Excel files (.csv, .xlsx)</p>
                         <p>or <span class="upload-link">click to browse</span></p>
+                        
                         <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" hidden>
                     </div>
                 </div>
+
                 <div class="test-section" style="margin-top: 20px; text-align: center;">
-                    <button id="runTestsBtn" class="test-button">🧪 Run Test Suite</button>
-                    <button id="runPerformanceBtn" class="test-button">⚡ Performance Test</button>
-                    <button id="generateSampleBtn" class="test-button">📄 Generate Sample Data</button>
+                    <button id="runTestsBtn" class="test-button">Run Test Suite</button>
+                    <button id="runPerformanceBtn" class="test-button">Performance Test</button>
+                    <button id="generateSampleBtn" class="test-button">Generate Sample Data</button>
                 </div>
                 <div class="processing-indicator" id="processingIndicator" style="display: none;">
                     <div class="spinner"></div>
@@ -58,6 +171,12 @@
                         <tbody id="summaryTableBody">
                         </tbody>
                     </table>
+                </div>
+
+
+                <!-- Toggle Button for Detailed View -->
+                <div class="toggle-section" style="text-align: center; margin: 20px 0;">
+                    <button class="toggle-details-btn" id="toggleDetailsBtn">View Detailed Transactions</button>
                 </div>
 
                 <!-- Detailed Transactions Table -->
@@ -91,6 +210,6 @@
         </main>
     </div>
 
-    <script src="app.js?v=16"></script>
+    <script src="app.js?v=37"></script>
 </body>
 </html>

@@ -5,6 +5,9 @@ class TransactionAnalyzer {
         this.filteredTransactions = [];
         this.sortColumn = null;
         this.sortDirection = 'asc';
+        this.selectedBank = null;
+        this.selectedAccountType = null;
+        this.lastFourDigits = null;
         
         // Row integrity tracking
         this.rowGuards = [];
@@ -17,6 +20,48 @@ class TransactionAnalyzer {
             policyConfidence: 0.0
         };
         
+        // Extended bank list for search functionality
+        this.allBanks = [
+            'Chase Bank', 'Bank of America', 'Wells Fargo', 'Citibank', 'U.S. Bank',
+            'PNC Bank', 'Capital One', 'Truist', 'Regions Bank', 'Huntington Bank',
+            'KeyBank', 'Comerica Bank', 'Citizens Bank', 'M&T Bank', 'TD Bank',
+            'Fifth Third Bank', 'BB&T', 'SunTrust', 'BMO Harris Bank', 'HSBC Bank',
+            'Santander Bank', 'Union Bank', 'Zions Bank', 'First National Bank', 'Bank of the West',
+            'First Citizens Bank', 'East West Bank', 'Cathay Bank', 'Silicon Valley Bank', 'Signature Bank',
+            'New York Community Bank', 'Flagstar Bank', 'Webster Bank', 'People\'s United Bank', 'Valley National Bank',
+            'Associated Bank', 'Old National Bank', 'First Horizon Bank', 'BancorpSouth', 'TCF Bank',
+            'UMB Bank', 'Frost Bank', 'BOK Financial', 'First Interstate Bank', 'City National Bank',
+            'Hancock Whitney', 'First Hawaiian Bank', 'Bank of Hawaii', 'Discover Bank', 'Ally Bank',
+            'Synchrony Bank', 'American Express', 'Goldman Sachs', 'Morgan Stanley', 'Charles Schwab',
+            'Fidelity', 'Vanguard', 'Alaska USA Federal Credit Union', 'Navy Federal Credit Union',
+            'USAA Federal Savings Bank', 'Pentagon Federal Credit Union', 'State Employees Credit Union',
+            'Teachers Credit Union', 'Alliant Credit Union', 'Digital Federal Credit Union',
+            'America First Credit Union', 'Mountain America Credit Union', 'Desert Financial Credit Union',
+            'Golden 1 Credit Union', 'SchoolsFirst Federal Credit Union', 'First Tech Federal Credit Union',
+            'Redwood Credit Union', 'Patelco Credit Union', 'Wescom Credit Union', 'Kinecta Federal Credit Union',
+            'Logix Federal Credit Union', 'Orange County Credit Union', 'San Diego County Credit Union',
+            'Mission Federal Credit Union', 'First Entertainment Credit Union', 'Premier America Credit Union',
+            'Financial Partners Credit Union', 'First Republic Bank', 'First National Bank of Omaha',
+            'Commerce Bank', 'Arvest Bank', 'First Tennessee Bank', 'Synovus Bank', 'First Security Bank',
+            'First Interstate Bank', 'First National Bank of Pennsylvania', 'First Merchants Bank',
+            'First Mid Bank & Trust', 'First Bank', 'First State Bank', 'First Community Bank',
+            'First National Bank of Texas', 'First National Bank of Arizona', 'First National Bank of Colorado',
+            'First National Bank of Florida', 'First National Bank of Georgia', 'First National Bank of Illinois',
+            'First National Bank of Indiana', 'First National Bank of Iowa', 'First National Bank of Kansas',
+            'First National Bank of Kentucky', 'First National Bank of Louisiana', 'First National Bank of Maine',
+            'First National Bank of Maryland', 'First National Bank of Massachusetts', 'First National Bank of Michigan',
+            'First National Bank of Minnesota', 'First National Bank of Mississippi', 'First National Bank of Missouri',
+            'First National Bank of Montana', 'First National Bank of Nebraska', 'First National Bank of Nevada',
+            'First National Bank of New Hampshire', 'First National Bank of New Jersey', 'First National Bank of New Mexico',
+            'First National Bank of New York', 'First National Bank of North Carolina', 'First National Bank of North Dakota',
+            'First National Bank of Ohio', 'First National Bank of Oklahoma', 'First National Bank of Oregon',
+            'First National Bank of Pennsylvania', 'First National Bank of Rhode Island', 'First National Bank of South Carolina',
+            'First National Bank of South Dakota', 'First National Bank of Tennessee', 'First National Bank of Texas',
+            'First National Bank of Utah', 'First National Bank of Vermont', 'First National Bank of Virginia',
+            'First National Bank of Washington', 'First National Bank of West Virginia', 'First National Bank of Wisconsin',
+            'First National Bank of Wyoming'
+        ];
+        
         this.initializeEventListeners();
     }
 
@@ -26,6 +71,41 @@ class TransactionAnalyzer {
         const resetBtn = document.getElementById('resetBtn');
         const searchInput = document.getElementById('searchInput');
         const typeFilter = document.getElementById('typeFilter');
+
+        // Preliminary questions events
+        const bankDropdown = document.getElementById('bankDropdown');
+        const bankSearchInput = document.getElementById('bankSearchInput');
+        const bankSearchContainer = document.getElementById('bankSearchContainer');
+        const accountTypeDropdown = document.getElementById('accountTypeDropdown');
+        const lastFourDigitsInput = document.getElementById('lastFourDigits');
+        const continueToUploadBtn = document.getElementById('continueToUploadBtn');
+
+        if (bankDropdown) {
+            bankDropdown.addEventListener('change', this.handleBankSelection.bind(this));
+        }
+
+        if (bankSearchInput) {
+            bankSearchInput.addEventListener('input', this.handleBankSearch.bind(this));
+            bankSearchInput.addEventListener('blur', this.hideBankSearchResults.bind(this));
+        }
+
+        if (accountTypeDropdown) {
+            accountTypeDropdown.addEventListener('change', this.handleAccountTypeSelection.bind(this));
+        }
+
+        if (lastFourDigitsInput) {
+            lastFourDigitsInput.addEventListener('input', this.handleLastFourDigitsInput.bind(this));
+        }
+
+        if (continueToUploadBtn) {
+            continueToUploadBtn.addEventListener('click', this.proceedToUpload.bind(this));
+        }
+
+        // Back to questions button
+        const backToQuestionsBtn = document.getElementById('backToQuestionsBtn');
+        if (backToQuestionsBtn) {
+            backToQuestionsBtn.addEventListener('click', this.backToQuestions.bind(this));
+        }
 
         // File upload events
         uploadArea.addEventListener('click', () => fileInput.click());
@@ -62,6 +142,7 @@ class TransactionAnalyzer {
         if (generateSampleBtn) {
             generateSampleBtn.addEventListener('click', this.generateSampleData.bind(this));
         }
+
     }
 
     handleDragOver(e) {
@@ -159,7 +240,7 @@ class TransactionAnalyzer {
     }
 
     async parseExcel(file) {
-        console.log('🔍 Starting Excel file parsing for:', file.name);
+        console.log('Starting Excel file parsing for:', file.name);
         
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -168,23 +249,23 @@ class TransactionAnalyzer {
                     console.log('📁 Excel file read successfully, size:', e.target.result.byteLength, 'bytes');
                     
                     const data = new Uint8Array(e.target.result);
-                    console.log('📊 Converting to workbook...');
+                    console.log('Converting to workbook...');
                     
                     const workbook = XLSX.read(data, { type: 'array' });
-                    console.log('✅ Excel workbook loaded successfully');
-                    console.log('📋 Available sheets:', workbook.SheetNames);
+                    console.log('Excel workbook loaded successfully');
+                    console.log('Available sheets:', workbook.SheetNames);
                     
                     // Get the first worksheet
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
                     
-                    console.log('📄 Processing worksheet:', firstSheetName);
-                    console.log('📊 Worksheet range:', worksheet['!ref']);
+                    console.log('Processing worksheet:', firstSheetName);
+                    console.log('Worksheet range:', worksheet['!ref']);
                     
                     // Convert worksheet to JSON array
                     const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                    console.log('📈 Excel data converted to JSON:', jsonData.length, 'rows');
-                    console.log('📝 First few rows:', jsonData.slice(0, 3));
+                    console.log('Excel data converted to JSON:', jsonData.length, 'rows');
+                    console.log('First few rows:', jsonData.slice(0, 3));
                     
                     // Convert to CSV-like format for processing
                     const csvLines = jsonData.map((row, index) => {
@@ -204,22 +285,22 @@ class TransactionAnalyzer {
                     }).filter(line => line.trim());
                     
                     const csvText = csvLines.join('\n');
-                    console.log('📄 Converted to CSV format (first 500 chars):', csvText.substring(0, 500));
+                    console.log('Converted to CSV format (first 500 chars):', csvText.substring(0, 500));
                     
                     // Parse as CSV
-                    console.log('🔄 Starting CSV parsing...');
+                    console.log('Starting CSV parsing...');
                     const transactions = this.parseCSV(csvText);
-                    console.log('✅ Excel parsing completed, found', transactions.length, 'transactions');
+                    console.log('Excel parsing completed, found', transactions.length, 'transactions');
                     resolve(transactions);
                 } catch (error) {
-                    console.error('❌ Error parsing Excel file:', error);
+                    console.error(' Error parsing Excel file:', error);
                     console.error('Error details:', error.message);
                     console.error('Stack trace:', error.stack);
                     reject(new Error(`Error parsing Excel file: ${error.message}. Please check the format and try again.`));
                 }
             };
             reader.onerror = (error) => {
-                console.error('❌ FileReader error:', error);
+                console.error(' FileReader error:', error);
                 reject(new Error('Error reading Excel file.'));
             };
             reader.readAsArrayBuffer(file);
@@ -232,7 +313,7 @@ class TransactionAnalyzer {
     }
 
     findColumnMapping(lines) {
-        console.log('🔍 Searching for column mapping...');
+        console.log(' Searching for column mapping...');
         
         // Search through the first 20 lines to find the best header row
         for (let rowIndex = 0; rowIndex < Math.min(20, lines.length); rowIndex++) {
@@ -269,7 +350,7 @@ class TransactionAnalyzer {
             
             // If we found at least Date and Amount, this is a good header row
             if (dateIndex !== -1 && amountIndex !== -1) {
-                console.log(`✅ Found valid header row at line ${rowIndex}`);
+                console.log(` Found valid header row at line ${rowIndex}`);
                 return {
                     headerRow: rowIndex,
                     dateIndex: dateIndex,
@@ -280,7 +361,7 @@ class TransactionAnalyzer {
             }
         }
         
-        console.log('❌ No valid header row found');
+        console.log(' No valid header row found');
         return null;
     }
 
@@ -316,7 +397,7 @@ class TransactionAnalyzer {
             delimiter = bestDelimiter.char;
         }
         
-        // console.log(`🔍 Detected delimiter: "${delimiter}" for line: ${line.substring(0, 50)}...`);
+        // console.log(` Detected delimiter: "${delimiter}" for line: ${line.substring(0, 50)}...`);
         
         for (let i = 0; i < line.length; i++) {
             const char = line[i];
@@ -449,6 +530,28 @@ class TransactionAnalyzer {
         }
     }
 
+    getBankDisplayName(bankValue) {
+        const bankMappings = {
+            'chase': 'Chase',
+            'bank-of-america': 'BoA',
+            'wells-fargo': 'WF',
+            'capital-one': 'CapitalOne',
+            'american-express': 'Amex'
+        };
+        
+        return bankMappings[bankValue] || this.capitalizeFirst(bankValue.replace(/-/g, ' '));
+    }
+
+    getAccountTypeAbbreviation(accountType) {
+        const typeMappings = {
+            'checking': 'ck',
+            'savings': 'sav',
+            'credit-card': 'cc'
+        };
+        
+        return typeMappings[accountType] || accountType;
+    }
+
     displayResults() {
         const resultsSection = document.getElementById('resultsSection');
         resultsSection.style.display = 'block';
@@ -456,28 +559,63 @@ class TransactionAnalyzer {
         // Only display results if we have valid transactions
         if (this.transactions && this.transactions.length > 0) {
             // Clear any existing error content first
+            const accountType = this.selectedAccountType || 'cash'; // Default to cash if not selected
+            const bankName = this.getBankDisplayName(this.selectedBank);
+            const accountTypeAbbr = this.getAccountTypeAbbreviation(accountType);
+            const lastFour = this.lastFourDigits || '****';
+            const headerTitle = `${bankName} ${accountTypeAbbr}${lastFour}`;
+            
+            // Determine column headers based on account type
+            let columnHeaders = '';
+            if (accountType === 'credit-card') {
+                columnHeaders = `
+                    <tr class="table-title-row">
+                        <th colspan="4">${headerTitle}</th>
+                    </tr>
+                    <tr>
+                        <th>Month</th>
+                        <th>Charges</th>
+                        <th>Payments</th>
+                        <th>Totals</th>
+                    </tr>
+                `;
+            } else {
+                columnHeaders = `
+                    <tr class="table-title-row">
+                        <th colspan="5">${headerTitle}</th>
+                    </tr>
+                    <tr>
+                        <th>Month</th>
+                        <th>Debits</th>
+                        <th>Credits</th>
+                        <th>Checks</th>
+                        <th>Totals</th>
+                    </tr>
+                `;
+            }
+            
             resultsSection.innerHTML = `
                 <h2>Transaction Analysis</h2>
                 
                 <!-- Summary Table -->
                 <div class="summary-section">
-                    <h3>Summary</h3>
+                    <h3>Monthly Transaction Counts</h3>
                     <table class="summary-table" id="summaryTable">
                         <thead>
-                            <tr>
-                                <th>Transaction Type</th>
-                                <th>Count</th>
-                                <th>Total Amount</th>
-                                <th>Average Amount</th>
-                            </tr>
+                            ${columnHeaders}
                         </thead>
                         <tbody id="summaryTableBody">
                         </tbody>
                     </table>
                 </div>
 
-                <!-- Detailed Transactions Table -->
-                <div class="transactions-section">
+                <!-- Toggle Button for Detailed View -->
+                <div class="toggle-section" style="text-align: center; margin: 20px 0;">
+                    <button class="toggle-details-btn" id="toggleDetailsBtn"> View Detailed Transactions</button>
+                </div>
+
+                <!-- Detailed Transactions Table (Hidden by default) -->
+                <div class="transactions-section" id="transactionsSection" style="display: none;">
                     <h3>All Transactions</h3>
                     <div class="table-controls">
                         <input type="text" id="searchInput" placeholder="Search transactions..." class="search-input">
@@ -509,11 +647,10 @@ class TransactionAnalyzer {
             this.attachEventListeners();
             
             this.displayColumnDetection();
-            this.displayAccountType();
             this.displayParsingConfidence();
             // this.displayDiagnostics(); // Hidden as requested
             this.displaySummary();
-            this.displayTransactions();
+            // this.displayTransactions(); // Only show when user clicks toggle
             this.displayDebugInfo();
         } else {
             // Show error message instead of false positives
@@ -535,23 +672,23 @@ class TransactionAnalyzer {
         detectionInfo.id = 'columnDetectionInfo';
         detectionInfo.className = 'column-detection';
         detectionInfo.innerHTML = `
-            <h3>📊 Column Detection Results</h3>
+            <h3> Column Detection Results</h3>
             <div class="detection-grid">
                 <div class="detection-item">
                     <span class="detection-label">Date Column:</span>
-                    <span class="detection-value">✅ Detected</span>
+                    <span class="detection-value"> Detected</span>
                 </div>
                 <div class="detection-item">
                     <span class="detection-label">Description Column:</span>
-                    <span class="detection-value">✅ Detected</span>
+                    <span class="detection-value"> Detected</span>
                 </div>
                 <div class="detection-item">
                     <span class="detection-label">Amount Column:</span>
-                    <span class="detection-value">✅ Detected</span>
+                    <span class="detection-value"> Detected</span>
                 </div>
                 <div class="detection-item">
                     <span class="detection-label">Type Column:</span>
-                    <span class="detection-value">${this.transactions.length > 0 && this.transactions[0].type ? '✅ Detected' : '⚠️ Auto-detected from amounts'}</span>
+                    <span class="detection-value">${this.transactions.length > 0 && this.transactions[0].type ? ' Detected' : ' Auto-detected from amounts'}</span>
                 </div>
             </div>
             <p class="detection-note">The analyzer automatically found and mapped your spreadsheet columns.</p>
@@ -562,81 +699,6 @@ class TransactionAnalyzer {
         resultsSection.insertBefore(detectionInfo, summarySection);
     }
 
-    displayAccountType() {
-        const resultsSection = document.getElementById('resultsSection');
-        
-        // Check if account type info already exists
-        let accountInfo = document.getElementById('accountTypeInfo');
-        if (accountInfo) {
-            accountInfo.remove();
-        }
-        
-        // Determine account type with better detection
-        let detectedType = 'Unknown';
-        if (this.accountType && this.accountType !== 'unknown') {
-            detectedType = this.capitalizeFirst(this.accountType);
-        } else if (this.parsingFlags?.accountType && this.parsingFlags.accountType !== 'unknown') {
-            detectedType = this.capitalizeFirst(this.parsingFlags.accountType);
-        }
-        
-        // Calculate overall confidence
-        const policyConfidence = this.parsingFlags?.policyConfidence || 0;
-        const tableConfidence = this.parsingFlags?.tableConfidence || 0;
-        const overallConfidence = (policyConfidence + tableConfidence) / 2;
-        
-        // Determine confidence level and detailed message
-        let confidenceLevel = 'Low';
-        let confidenceMessage = '';
-        let specificReasons = [];
-        
-        // Analyze specific factors affecting confidence
-        if (policyConfidence < 0.5) {
-            specificReasons.push('Weak signals in file name and content patterns');
-        }
-        if (tableConfidence < 0.8) {
-            specificReasons.push('Some transaction data appears incomplete or unclear');
-        }
-        if (overallConfidence < 0.3) {
-            specificReasons.push('Very limited account type indicators found');
-        }
-        
-        if (overallConfidence >= 0.8) {
-            confidenceLevel = 'High';
-            if (specificReasons.length === 0) {
-                confidenceMessage = 'Strong signals detected in file name, content patterns, and transaction types.';
-            } else {
-                confidenceMessage = `Strong overall confidence, but: ${specificReasons.join(', ')}.`;
-            }
-        } else if (overallConfidence >= 0.6) {
-            confidenceLevel = 'Medium';
-            confidenceMessage = `Moderate confidence due to: ${specificReasons.join(', ')}.`;
-        } else {
-            confidenceLevel = 'Low';
-            confidenceMessage = `Low confidence due to: ${specificReasons.join(', ')}.`;
-        }
-        
-        accountInfo = document.createElement('div');
-        accountInfo.id = 'accountTypeInfo';
-        accountInfo.className = 'column-detection';
-        accountInfo.innerHTML = `
-            <h3>🏦 Account Type Detection</h3>
-            <div class="detection-grid">
-                <div class="detection-item">
-                    <span class="detection-label">Account Type:</span>
-                    <span class="detection-value">${detectedType}</span>
-                </div>
-                <div class="detection-item">
-                    <span class="detection-label">Detection Confidence:</span>
-                    <span class="detection-value">${confidenceLevel} (${(overallConfidence * 100).toFixed(1)}%)</span>
-                </div>
-            </div>
-            <p class="detection-note">${confidenceMessage}</p>
-        `;
-        
-        // Insert before the summary section
-        const summarySection = resultsSection.querySelector('.summary-section');
-        resultsSection.insertBefore(accountInfo, summarySection);
-    }
 
     displayParsingConfidence() {
         const resultsSection = document.getElementById('resultsSection');
@@ -781,7 +843,7 @@ class TransactionAnalyzer {
         parsingInfo.id = 'parsingConfidenceInfo';
         parsingInfo.className = 'column-detection';
         parsingInfo.innerHTML = `
-            <h3>📊 Data Parsing Confidence</h3>
+            <h3> Data Parsing Confidence</h3>
             <div class="detection-grid">
                 <div class="detection-item">
                     <span class="detection-label">Parsing Confidence:</span>
@@ -805,7 +867,7 @@ class TransactionAnalyzer {
         
         // Clear any existing content
         resultsSection.innerHTML = `
-            <h2>❌ File Processing Failed</h2>
+            <h2> File Processing Failed</h2>
             <div class="error-section">
                 <div class="error-message">
                     <h3>Unable to process your file</h3>
@@ -822,7 +884,7 @@ class TransactionAnalyzer {
                     <div class="error-solutions">
                         <h4>Solutions:</h4>
                         <ul>
-                            <li>Click "📄 Generate Sample Data" to see the expected format</li>
+                            <li>Click " Generate Sample Data" to see the expected format</li>
                             <li>Ensure your file has a header row with "Date" and "Amount" columns</li>
                             <li>Add at least one row of transaction data</li>
                             <li>Use proper date formats (MM/DD/YYYY, etc.)</li>
@@ -860,99 +922,76 @@ class TransactionAnalyzer {
         const summaryTableBody = document.getElementById('summaryTableBody');
         summaryTableBody.innerHTML = '';
 
-        if (this.accountType === 'credit' && this.counts) {
-            // Display credit account counts
-            const creditTypes = [
-                { key: 'payments', label: 'Payments' },
-                { key: 'charges', label: 'Charges' },
-                { key: 'refunds', label: 'Refunds' }
-            ];
+        // Group transactions by month
+        const monthlyData = this.groupTransactionsByMonth();
+        
+        // Get all months and sort them chronologically
+        const months = Object.keys(monthlyData).sort((a, b) => {
+            const dateA = new Date(a);
+            const dateB = new Date(b);
+            return dateA - dateB;
+        });
+        
+        // Display each month as a single row
+        months.forEach(month => {
+            const monthData = monthlyData[month];
             
-            creditTypes.forEach(type => {
-                const count = this.counts[type.key] || 0;
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="type-${type.key}">${type.label}</td>
-                    <td>${count}</td>
-                    <td>-</td>
-                    <td>-</td>
+            const monthRow = document.createElement('tr');
+            
+            // Calculate totals for this month
+            const monthTotal = monthData.debits.count + monthData.credits.count + monthData.checks.count;
+            
+            if (this.selectedAccountType === 'credit-card') {
+                // Credit card: Month, Charges, Payments, Totals
+                monthRow.innerHTML = `
+                    <td>${month}</td>
+                    <td>${monthData.debits.count}</td>
+                    <td>${monthData.credits.count}</td>
+                    <td>${monthTotal}</td>
                 `;
-                summaryTableBody.appendChild(row);
-            });
-            
-            // Add totals row
-            const totalsRow = document.createElement('tr');
-            totalsRow.style.fontWeight = 'bold';
-            totalsRow.style.backgroundColor = '#f8f9fa';
-            totalsRow.innerHTML = `
-                <td>Total</td>
-                <td>${this.counts.total || 0}</td>
-                <td>-</td>
-                <td>-</td>
-            `;
-            summaryTableBody.appendChild(totalsRow);
-            
-        } else if (this.accountType === 'cash' && this.counts) {
-            // Display cash account counts
-            const cashTypes = [
-                { key: 'debits', label: 'Debits' },
-                { key: 'credits', label: 'Credits' },
-                { key: 'checks', label: 'Checks' }
-            ];
-            
-            cashTypes.forEach(type => {
-                const count = this.counts[type.key] || 0;
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="type-${type.key}">${type.label}</td>
-                    <td>${count}</td>
-                    <td>-</td>
-                    <td>-</td>
+            } else {
+                // Cash account: Month, Debits, Credits, Checks, Totals
+                monthRow.innerHTML = `
+                    <td>${month}</td>
+                    <td>${monthData.debits.count}</td>
+                    <td>${monthData.credits.count}</td>
+                    <td>${monthData.checks.count}</td>
+                    <td>${monthTotal}</td>
                 `;
-                summaryTableBody.appendChild(row);
-            });
+            }
             
-            // Add totals row
-            const totalsRow = document.createElement('tr');
-            totalsRow.style.fontWeight = 'bold';
-            totalsRow.style.backgroundColor = '#f8f9fa';
-            totalsRow.innerHTML = `
-                <td>Total</td>
-                <td>${this.counts.total || 0}</td>
-                <td>-</td>
-                <td>-</td>
+            summaryTableBody.appendChild(monthRow);
+        });
+        
+        // Overall totals row
+        const overallTotals = this.calculateOverallTotals();
+        const overallTotalsRow = document.createElement('tr');
+        overallTotalsRow.style.fontWeight = 'bold';
+        overallTotalsRow.style.backgroundColor = '#007bff';
+        overallTotalsRow.style.color = 'white';
+        
+        const grandTotal = overallTotals.debits.count + overallTotals.credits.count + overallTotals.checks.count;
+        
+        if (this.selectedAccountType === 'credit-card') {
+            // Credit card totals
+            overallTotalsRow.innerHTML = `
+                <td>TOTAL</td>
+                <td>${overallTotals.debits.count}</td>
+                <td>${overallTotals.credits.count}</td>
+                <td>${grandTotal}</td>
             `;
-            summaryTableBody.appendChild(totalsRow);
-            
         } else {
-            // Fallback to original summary calculation
-            const summary = this.calculateSummary();
-            
-            // Display each transaction type
-            ['checks', 'debits', 'credits'].forEach(type => {
-                const data = summary[type];
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="type-${type}">${this.capitalizeFirst(type)}</td>
-                    <td>${data.count}</td>
-                    <td class="${data.total >= 0 ? 'amount-positive' : 'amount-negative'}">$${Math.abs(data.total).toFixed(2)}</td>
-                    <td class="${data.average >= 0 ? 'amount-positive' : 'amount-negative'}">$${Math.abs(data.average).toFixed(2)}</td>
-                `;
-                summaryTableBody.appendChild(row);
-            });
-
-            // Add totals row
-            const totalsRow = document.createElement('tr');
-            totalsRow.style.fontWeight = 'bold';
-            totalsRow.style.backgroundColor = '#f8f9fa';
-            totalsRow.innerHTML = `
-                <td>Total</td>
-                <td>${summary.total.count}</td>
-                <td class="${summary.total.total >= 0 ? 'amount-positive' : 'amount-negative'}">$${Math.abs(summary.total.total).toFixed(2)}</td>
-                <td class="${summary.total.average >= 0 ? 'amount-positive' : 'amount-negative'}">$${Math.abs(summary.total.average).toFixed(2)}</td>
+            // Cash account totals
+            overallTotalsRow.innerHTML = `
+                <td>TOTAL</td>
+                <td>${overallTotals.debits.count}</td>
+                <td>${overallTotals.credits.count}</td>
+                <td>${overallTotals.checks.count}</td>
+                <td>${grandTotal}</td>
             `;
-            summaryTableBody.appendChild(totalsRow);
         }
+        
+        summaryTableBody.appendChild(overallTotalsRow);
     }
 
     displayTransactions() {
@@ -971,7 +1010,43 @@ class TransactionAnalyzer {
         });
     }
 
-    calculateSummary() {
+    groupTransactionsByMonth() {
+        const monthlyData = {};
+        
+        this.transactions.forEach(transaction => {
+            const date = new Date(transaction.date);
+            const monthKey = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+            
+            if (!monthlyData[monthKey]) {
+                monthlyData[monthKey] = {
+                    debits: { count: 0, total: 0, average: 0 },
+                    credits: { count: 0, total: 0, average: 0 },
+                    checks: { count: 0, total: 0, average: 0 },
+                    total: { count: 0, total: 0, average: 0 }
+                };
+            }
+            
+            const type = transaction.type;
+            monthlyData[monthKey][type].count++;
+            monthlyData[monthKey][type].total += transaction.amount;
+            monthlyData[monthKey].total.count++;
+            monthlyData[monthKey].total.total += transaction.amount;
+        });
+        
+        // Calculate averages for each month
+        Object.keys(monthlyData).forEach(month => {
+            const monthData = monthlyData[month];
+            Object.keys(monthData).forEach(type => {
+                if (monthData[type].count > 0) {
+                    monthData[type].average = monthData[type].total / monthData[type].count;
+                }
+            });
+        });
+        
+        return monthlyData;
+    }
+    
+    calculateOverallTotals() {
         const summary = {
             checks: { count: 0, total: 0, average: 0 },
             debits: { count: 0, total: 0, average: 0 },
@@ -995,6 +1070,10 @@ class TransactionAnalyzer {
         });
 
         return summary;
+    }
+
+    calculateSummary() {
+        return this.calculateOverallTotals();
     }
 
     filterTransactions() {
@@ -1088,10 +1167,28 @@ class TransactionAnalyzer {
         const resetBtn = document.getElementById('resetBtn');
         const searchInput = document.getElementById('searchInput');
         const typeFilter = document.getElementById('typeFilter');
+        const toggleDetailsBtn = document.getElementById('toggleDetailsBtn');
 
         // Reset button
         if (resetBtn) {
             resetBtn.addEventListener('click', this.reset.bind(this));
+        }
+
+        // Toggle details button
+        if (toggleDetailsBtn) {
+            toggleDetailsBtn.addEventListener('click', this.toggleDetails.bind(this));
+        }
+
+        // Account type selection buttons
+        const cashAccountBtn = document.getElementById('cashAccountBtn');
+        const creditAccountBtn = document.getElementById('creditAccountBtn');
+
+        if (cashAccountBtn) {
+            cashAccountBtn.addEventListener('click', () => this.selectAccountType('cash'));
+        }
+
+        if (creditAccountBtn) {
+            creditAccountBtn.addEventListener('click', () => this.selectAccountType('credit'));
         }
 
         // Search and filter
@@ -1113,8 +1210,31 @@ class TransactionAnalyzer {
         this.filteredTransactions = [];
         this.sortColumn = null;
         this.sortDirection = 'asc';
+        this.selectedBank = null;
+        this.selectedAccountType = null;
+        this.lastFourDigits = null;
 
+        // Hide results and show preliminary questions
         document.getElementById('resultsSection').style.display = 'none';
+        document.getElementById('preliminaryQuestionsSection').style.display = 'block';
+        document.getElementById('uploadSection').style.display = 'none';
+        
+        // Reset preliminary questions
+        const bankDropdown = document.getElementById('bankDropdown');
+        const bankSearchInput = document.getElementById('bankSearchInput');
+        const bankSearchContainer = document.getElementById('bankSearchContainer');
+        const accountTypeDropdown = document.getElementById('accountTypeDropdown');
+        const lastFourDigitsInput = document.getElementById('lastFourDigits');
+        const continueToUploadBtn = document.getElementById('continueToUploadBtn');
+        
+        if (bankDropdown) bankDropdown.value = '';
+        if (bankSearchInput) bankSearchInput.value = '';
+        if (bankSearchContainer) bankSearchContainer.style.display = 'none';
+        if (accountTypeDropdown) accountTypeDropdown.value = '';
+        if (lastFourDigitsInput) lastFourDigitsInput.value = '';
+        if (continueToUploadBtn) continueToUploadBtn.disabled = true;
+        
+        // Reset file input
         document.getElementById('fileInput').value = '';
         
         // Only reset these if they exist (they might not be in the DOM)
@@ -1130,8 +1250,221 @@ class TransactionAnalyzer {
         });
     }
 
+    selectAccountType(accountType) {
+        console.log(` Selected account type: ${accountType}`);
+        
+        // Store the selected account type
+        this.selectedAccountType = accountType;
+        
+        // If results are already displayed, update the table
+        if (this.transactions && this.transactions.length > 0) {
+            this.updateTableForAccountType(accountType);
+        }
+    }
+
+
+
+
+
+    updateTableForAccountType(accountType) {
+        const tableHead = document.querySelector('#summaryTable thead tr');
+        const tableBody = document.getElementById('summaryTableBody');
+        
+        if (!tableHead || !tableBody) return;
+        
+        if (accountType === 'cash') {
+            // Cash account: Month, Debits, Credits, Checks
+            tableHead.innerHTML = `
+                <th>Month</th>
+                <th>Debits</th>
+                <th>Credits</th>
+                <th>Checks</th>
+            `;
+        } else if (accountType === 'credit') {
+            // Credit card: Month, Charges, Payments, Refunds
+            tableHead.innerHTML = `
+                <th>Month</th>
+                <th>Charges</th>
+                <th>Payments</th>
+                <th>Refunds</th>
+            `;
+        }
+        
+        // Regenerate the table data
+        this.displaySummary();
+    }
+
+    toggleDetails() {
+        const transactionsSection = document.getElementById('transactionsSection');
+        const toggleBtn = document.getElementById('toggleDetailsBtn');
+        
+        if (transactionsSection && toggleBtn) {
+            if (transactionsSection.style.display === 'none') {
+                // Show details
+                transactionsSection.style.display = 'block';
+                toggleBtn.textContent = ' Hide Detailed Transactions';
+                toggleBtn.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+                toggleBtn.style.boxShadow = '0 4px 15px rgba(231, 76, 60, 0.3)';
+                
+                // Populate the transactions table if not already done
+                if (document.getElementById('transactionsTableBody').children.length === 0) {
+                    this.displayTransactions();
+                }
+            } else {
+                // Hide details
+                transactionsSection.style.display = 'none';
+                toggleBtn.textContent = ' View Detailed Transactions';
+                toggleBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                toggleBtn.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.3)';
+            }
+        }
+    }
+
     capitalizeFirst(str) {
         return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    // Bank Selection Methods
+    handleBankSelection(e) {
+        const selectedValue = e.target.value;
+        const bankSearchContainer = document.getElementById('bankSearchContainer');
+        
+        if (selectedValue === 'other') {
+            // Show search container
+            bankSearchContainer.style.display = 'block';
+            this.selectedBank = null;
+        } else if (selectedValue) {
+            // Hide search container
+            bankSearchContainer.style.display = 'none';
+            this.selectedBank = selectedValue;
+        } else {
+            // No selection
+            bankSearchContainer.style.display = 'none';
+            this.selectedBank = null;
+        }
+        
+        this.validateAllQuestions();
+    }
+
+    handleAccountTypeSelection(e) {
+        this.selectedAccountType = e.target.value;
+        this.validateAllQuestions();
+    }
+
+    handleLastFourDigitsInput(e) {
+        // Only allow numeric input
+        const value = e.target.value.replace(/\D/g, '');
+        e.target.value = value;
+        this.lastFourDigits = value;
+        this.validateAllQuestions();
+    }
+
+    validateAllQuestions() {
+        const continueToUploadBtn = document.getElementById('continueToUploadBtn');
+        
+        // Check if all three questions are answered
+        const bankSelected = this.selectedBank && this.selectedBank !== '';
+        const accountTypeSelected = this.selectedAccountType && this.selectedAccountType !== '';
+        const lastFourEntered = this.lastFourDigits && this.lastFourDigits.length === 4;
+        
+        if (bankSelected && accountTypeSelected && lastFourEntered) {
+            continueToUploadBtn.disabled = false;
+        } else {
+            continueToUploadBtn.disabled = true;
+        }
+    }
+
+    handleBankSearch(e) {
+        const searchTerm = e.target.value.toLowerCase().trim();
+        const searchResults = document.getElementById('bankSearchResults');
+        
+        if (searchTerm.length < 2) {
+            searchResults.style.display = 'none';
+            this.selectedBank = null;
+            this.validateAllQuestions();
+            return;
+        }
+        
+        // Filter banks based on search term
+        const filteredBanks = this.allBanks.filter(bank => 
+            bank.toLowerCase().includes(searchTerm)
+        ).slice(0, 10); // Limit to 10 results
+        
+        if (filteredBanks.length > 0) {
+            searchResults.innerHTML = filteredBanks.map(bank => 
+                `<div class="bank-search-result" data-bank="${bank}">${bank}</div>`
+            ).join('');
+            searchResults.style.display = 'block';
+            
+            // Add click handlers to search results
+            searchResults.querySelectorAll('.bank-search-result').forEach(result => {
+                result.addEventListener('click', (e) => {
+                    const selectedBank = e.target.dataset.bank;
+                    this.selectBankFromSearch(selectedBank);
+                });
+            });
+        } else {
+            searchResults.style.display = 'none';
+            this.selectedBank = null;
+            this.validateAllQuestions();
+        }
+    }
+
+    selectBankFromSearch(bankName) {
+        const bankSearchInput = document.getElementById('bankSearchInput');
+        const searchResults = document.getElementById('bankSearchResults');
+        
+        bankSearchInput.value = bankName;
+        searchResults.style.display = 'none';
+        this.selectedBank = bankName;
+        this.validateAllQuestions();
+    }
+
+    hideBankSearchResults() {
+        // Add a small delay to allow click events to fire
+        setTimeout(() => {
+            const searchResults = document.getElementById('bankSearchResults');
+            if (searchResults) {
+                searchResults.style.display = 'none';
+            }
+        }, 200);
+    }
+
+    proceedToUpload() {
+        if (!this.selectedBank || !this.selectedAccountType || !this.lastFourDigits) {
+            alert('Please complete all questions before continuing.');
+            return;
+        }
+        
+        // Hide preliminary questions and show upload section
+        const preliminaryQuestionsSection = document.getElementById('preliminaryQuestionsSection');
+        const uploadSection = document.getElementById('uploadSection');
+        
+        preliminaryQuestionsSection.style.display = 'none';
+        uploadSection.style.display = 'block';
+        
+        console.log('Account information:', {
+            bank: this.selectedBank,
+            accountType: this.selectedAccountType,
+            lastFourDigits: this.lastFourDigits
+        });
+    }
+
+    backToQuestions() {
+        // Hide upload section and show preliminary questions
+        const preliminaryQuestionsSection = document.getElementById('preliminaryQuestionsSection');
+        const uploadSection = document.getElementById('uploadSection');
+        
+        uploadSection.style.display = 'none';
+        preliminaryQuestionsSection.style.display = 'block';
+        
+        // Clear any uploaded file
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        
+        console.log('Returned to account information section');
     }
 
     // RowGuard System for Row Integrity
@@ -1164,12 +1497,12 @@ class TransactionAnalyzer {
                 throw new Error(`[RowGuard] column count drift on row ${i} @ ${stage}: ${before[i].length} -> ${after[i].length}`);
             }
         }
-        console.log(`✅ RowGuard: ${stage} passed - ${before.length} rows, ${before[0]?.length || 0} columns`);
+        console.log(` RowGuard: ${stage} passed - ${before.length} rows, ${before[0]?.length || 0} columns`);
     }
 
     // Enhanced CSV parsing with row integrity
     parseCSVSafe(text) {
-        console.log('🔍 Starting safe CSV parsing...');
+        console.log(' Starting safe CSV parsing...');
         
         // Step 1: Initial parse with row fingerprinting
         const lines = text.split('\n');
@@ -1177,7 +1510,7 @@ class TransactionAnalyzer {
         
         // Create initial fingerprint
         const initialFingerprint = initialRows.map((row, i) => this.fpRow(i, row));
-        console.log('📊 Initial fingerprint created:', initialFingerprint.length, 'rows');
+        console.log(' Initial fingerprint created:', initialFingerprint.length, 'rows');
         
         try {
             // Step 2: Header detection with integrity check
@@ -1204,11 +1537,11 @@ class TransactionAnalyzer {
             // Step 4: Final integrity check
             this.assertStable(initialRows, initialRows, 'CSV parse complete');
             
-            console.log('✅ CSV parsing completed with row integrity maintained');
+            console.log(' CSV parsing completed with row integrity maintained');
             return transactions;
             
         } catch (error) {
-            console.error('❌ Row integrity violation:', error.message);
+            console.error(' Row integrity violation:', error.message);
             this.parsingFlags.rowDriftBlocked = true;
             this.parsingFlags.usedFallbacks.push('rowDriftBlocked');
             throw error;
@@ -1216,7 +1549,7 @@ class TransactionAnalyzer {
     }
 
     findColumnMappingSafe(lines) {
-        console.log('🔍 Safe column mapping search...');
+        console.log(' Safe column mapping search...');
         
         // First, check if we have enough meaningful data (more lenient)
         const meaningfulLines = lines.filter(line => {
@@ -1229,10 +1562,10 @@ class TransactionAnalyzer {
             return nonEmptyCells.length >= 1; // Need at least 1 column with data
         });
         
-        console.log(`📊 Found ${meaningfulLines.length} lines with meaningful data out of ${lines.length} total lines`);
+        console.log(` Found ${meaningfulLines.length} lines with meaningful data out of ${lines.length} total lines`);
         
         if (meaningfulLines.length < 1) {
-            console.log('❌ Insufficient data: No meaningful content found');
+            console.log(' Insufficient data: No meaningful content found');
             throw new Error('Insufficient data: Your file appears to contain mostly empty cells. Please ensure your spreadsheet has proper transaction data with at least Date and Amount columns.');
         }
         
@@ -1246,7 +1579,7 @@ class TransactionAnalyzer {
             // Skip rows that are too sparse
             const nonEmptyHeaders = headers.filter(h => h && h.trim());
             if (nonEmptyHeaders.length < 2) {
-                console.log(`⚠️ Skipping row ${rowIndex} - too sparse (${nonEmptyHeaders.length} non-empty cells)`);
+                console.log(` Skipping row ${rowIndex} - too sparse (${nonEmptyHeaders.length} non-empty cells)`);
                 continue;
             }
             
@@ -1281,7 +1614,7 @@ class TransactionAnalyzer {
                 const isValidHeader = this.validateHeaderRow(lines, rowIndex, dateIndex, amountIndex);
                 
                 if (isValidHeader) {
-                    console.log(`✅ Found valid header row at line ${rowIndex}`);
+                    console.log(` Found valid header row at line ${rowIndex}`);
                     return {
                         headerRow: rowIndex,
                         dateIndex: dateIndex,
@@ -1290,12 +1623,12 @@ class TransactionAnalyzer {
                         typeIndex: typeIndex
                     };
                 } else {
-                    console.log(`⚠️ Header row at line ${rowIndex} failed validation - likely gibberish`);
+                    console.log(` Header row at line ${rowIndex} failed validation - likely gibberish`);
                 }
             }
         }
         
-        console.log('❌ No valid header row found');
+        console.log(' No valid header row found');
         throw new Error('No valid transaction data found. Please ensure your file contains:\n• A header row with "Date" and "Amount" columns\n• At least one row of transaction data\n• Proper date formats (MM/DD/YYYY, etc.)\n• Numeric amounts');
     }
 
@@ -1345,7 +1678,7 @@ class TransactionAnalyzer {
     }
     
     validateHeaderRow(lines, headerRowIndex, dateIndex, amountIndex) {
-        console.log(`🔍 Validating header row at line ${headerRowIndex}`);
+        console.log(` Validating header row at line ${headerRowIndex}`);
         
         // Check the next 5 rows to see if they contain actual data
         const sampleRows = [];
@@ -1357,16 +1690,16 @@ class TransactionAnalyzer {
                     const row = this.parseCSVLine(line);
                     if (row.length > Math.max(dateIndex, amountIndex)) {
                         sampleRows.push(row);
-                        console.log(`📊 Sample row ${i}:`, row);
+                        console.log(` Sample row ${i}:`, row);
                     }
                 }
             }
         }
         
-        console.log(`📊 Found ${sampleRows.length} sample rows`);
+        console.log(` Found ${sampleRows.length} sample rows`);
         
         if (sampleRows.length === 0) {
-            console.log('❌ No sample rows found');
+            console.log(' No sample rows found');
             return false; // No data rows found
         }
         
@@ -1377,21 +1710,21 @@ class TransactionAnalyzer {
             const dateValue = row[dateIndex];
             const amountValue = row[amountIndex];
             
-            console.log(`🔍 Row ${i}: date="${dateValue}", amount="${amountValue}"`);
+            console.log(` Row ${i}: date="${dateValue}", amount="${amountValue}"`);
             
             // Check if date looks like a real date
             const isDateValid = this.isValidDate(dateValue);
-            console.log(`📅 Date valid: ${isDateValid}`);
+            console.log(` Date valid: ${isDateValid}`);
             
             // Check if amount looks like a real amount
             const isAmountValid = this.isValidAmount(amountValue);
-            console.log(`💰 Amount valid: ${isAmountValid}`);
+            console.log(` Amount valid: ${isAmountValid}`);
             
             if (isDateValid && isAmountValid) {
                 validDataCount++;
-                console.log(`✅ Row ${i} has valid data`);
+                console.log(` Row ${i} has valid data`);
             } else {
-                console.log(`❌ Row ${i} has invalid data`);
+                console.log(` Row ${i} has invalid data`);
             }
         }
         
@@ -1399,7 +1732,7 @@ class TransactionAnalyzer {
         const requiredValidRows = Math.ceil(sampleRows.length * 0.5);
         const isValid = validDataCount >= requiredValidRows;
         
-        console.log(`📊 Validation result: ${validDataCount}/${sampleRows.length} valid rows, required: ${requiredValidRows}, result: ${isValid}`);
+        console.log(` Validation result: ${validDataCount}/${sampleRows.length} valid rows, required: ${requiredValidRows}, result: ${isValid}`);
         
         return isValid;
     }
@@ -1745,60 +2078,7 @@ class TransactionAnalyzer {
         }
     }
 
-    // Account Type Detection System
-    detectAccountType(meta, sampleRows) {
-        console.log('🔍 Detecting account type...');
-        
-        // Check for explicit user override
-        if (meta && meta.accountType) {
-            console.log('✅ User override detected:', meta.accountType);
-            return meta.accountType;
-        }
-        
-        // Check sheet/file labels
-        const sheetName = meta?.sheetName?.toLowerCase() || '';
-        const fileName = meta?.fileName?.toLowerCase() || '';
-        
-        const cashKeywords = ['checking', 'savings', 'brokerage', 'cash', 'bank'];
-        const creditKeywords = ['credit', 'card', 'amex', 'visa', 'mastercard', 'discover'];
-        
-        if (cashKeywords.some(keyword => sheetName.includes(keyword) || fileName.includes(keyword))) {
-            console.log('✅ Cash account detected from labels');
-            return 'cash';
-        }
-        
-        if (creditKeywords.some(keyword => sheetName.includes(keyword) || fileName.includes(keyword))) {
-            console.log('✅ Credit account detected from labels');
-            return 'credit';
-        }
-        
-        // Check section/header signals
-        const allText = sampleRows.map(row => 
-            `${row.description || ''} ${row.type || ''} ${row.section || ''}`
-        ).join(' ').toLowerCase();
-        
-        const cashSignals = ['checks paid', 'deposits', 'withdrawals', 'running balance', 'check #', 'ach in', 'ach out', 'direct deposit'];
-        const creditSignals = ['payments & credits', 'purchases', 'fees', 'interest charges', 'statement balance', 'new balance', 'payments and credits'];
-        
-        const cashScore = cashSignals.filter(signal => allText.includes(signal)).length;
-        const creditScore = creditSignals.filter(signal => allText.includes(signal)).length;
-        
-        console.log(`📊 Signal scores - Cash: ${cashScore}, Credit: ${creditScore}`);
-        
-        if (cashScore > creditScore && cashScore > 0) {
-            console.log('✅ Cash account detected from signals');
-            return 'cash';
-        }
-        
-        if (creditScore > cashScore && creditScore > 0) {
-            console.log('✅ Credit account detected from signals');
-            return 'credit';
-        }
-        
-        // If ambiguous, run both policies and choose the more confident
-        console.log('⚠️ Ambiguous account type, running both policies...');
-        return 'unknown';
-    }
+
 
     // Enhanced Counting System
     countTransactions(transactions, accountType) {
@@ -1817,7 +2097,7 @@ class TransactionAnalyzer {
             const cashConfidence = this.calculatePolicyConfidence(transactions, 'cash');
             const creditConfidence = this.calculatePolicyConfidence(transactions, 'credit');
             
-            console.log(`📊 Policy confidence - Cash: ${cashConfidence}, Credit: ${creditConfidence}`);
+            console.log(` Policy confidence - Cash: ${cashConfidence}, Credit: ${creditConfidence}`);
             
             if (cashConfidence > creditConfidence) {
                 this.parsingFlags.policyConfidence = cashConfidence;
@@ -1874,7 +2154,7 @@ class TransactionAnalyzer {
             }
         }
         
-        console.log(`📊 Cash counts - Debits: ${debits}, Credits: ${credits}, Checks: ${checks}`);
+        console.log(` Cash counts - Debits: ${debits}, Credits: ${credits}, Checks: ${checks}`);
         return { debits, credits, checks, total: debits + credits, activePolicy: 'cash' };
     }
 
@@ -1924,7 +2204,7 @@ class TransactionAnalyzer {
             }
         }
         
-        console.log(`📊 Credit counts - Payments: ${payments}, Charges: ${charges}, Refunds: ${refunds}`);
+        console.log(` Credit counts - Payments: ${payments}, Charges: ${charges}, Refunds: ${refunds}`);
         return { payments, charges, refunds, total: payments + charges + refunds, activePolicy: 'credit' };
     }
 
@@ -1972,20 +2252,15 @@ class TransactionAnalyzer {
 
     // Enhanced transaction processing with account type detection
     async processFileEnhanced(file) {
-        console.log('🚀 Starting enhanced file processing...');
+        console.log(' Starting enhanced file processing...');
         
         try {
             // Parse the file
             const transactions = await this.parseSpreadsheet(file);
             
-            // Detect account type
-            const meta = {
-                fileName: file.name,
-                sheetName: 'Sheet1' // Default for single sheet
-            };
-            
-            const accountType = this.detectAccountType(meta, transactions);
-            console.log(`✅ Account type detected: ${accountType}`);
+            // Use user-selected account type
+            const accountType = this.selectedAccountType || 'cash';
+            console.log(` Using user-selected account type: ${accountType}`);
             
             // Count transactions based on account type
             const counts = this.countTransactions(transactions, accountType);
@@ -2000,11 +2275,11 @@ class TransactionAnalyzer {
             this.accountType = accountType;
             this.counts = counts;
             
-            console.log('✅ Enhanced processing completed');
+            console.log(' Enhanced processing completed');
             return { transactions, accountType, counts };
             
         } catch (error) {
-            console.error('❌ Enhanced processing failed:', error);
+            console.error(' Enhanced processing failed:', error);
             throw error;
         }
     }
@@ -2120,11 +2395,11 @@ class TransactionAnalyzer {
         diagnosticsInfo.id = 'diagnosticsInfo';
         diagnosticsInfo.className = 'column-detection';
         diagnosticsInfo.innerHTML = `
-            <h3>🔧 Processing Diagnostics</h3>
+            <h3> Processing Diagnostics</h3>
             <div class="detection-grid">
                 <div class="detection-item">
                     <span class="detection-label">Row Integrity:</span>
-                    <span class="detection-value">${this.parsingFlags.rowDriftBlocked ? '⚠️ Drift Blocked' : '✅ Stable'}</span>
+                    <span class="detection-value">${this.parsingFlags.rowDriftBlocked ? ' Drift Blocked' : ' Stable'}</span>
                 </div>
                 <div class="detection-item">
                     <span class="detection-label">Fallbacks Used:</span>
@@ -2132,7 +2407,7 @@ class TransactionAnalyzer {
                 </div>
                 <div class="detection-item">
                     <span class="detection-label">Warnings:</span>
-                    <span class="detection-value">${this.parsingFlags.rowDriftBlocked || this.parsingFlags.policyConfidence < 0.6 ? '⚠️ Issues Detected' : '✅ Clean'}</span>
+                    <span class="detection-value">${this.parsingFlags.rowDriftBlocked || this.parsingFlags.policyConfidence < 0.6 ? ' Issues Detected' : ' Clean'}</span>
                 </div>
                 <div class="detection-item">
                     <span class="detection-label">Processing Mode:</span>
@@ -2149,27 +2424,27 @@ class TransactionAnalyzer {
 
     // Tiered Failsafes and Recovery System
     async processFileWithFailsafes(file) {
-        console.log('🛡️ Starting tiered failsafe processing...');
+        console.log(' Starting tiered failsafe processing...');
         
         try {
             // Tier 1: Normal processing
             return await this.processFileEnhanced(file);
         } catch (error) {
-            console.warn('⚠️ Tier 1 failed, trying relaxed mapper...', error.message);
+            console.warn(' Tier 1 failed, trying relaxed mapper...', error.message);
             this.parsingFlags.usedFallbacks.push('relaxedMapper');
             
             try {
                 // Tier 2: Relaxed mapper with lower thresholds
                 return await this.processFileRelaxed(file);
             } catch (error2) {
-                console.warn('⚠️ Tier 2 failed, trying greedy band search...', error2.message);
+                console.warn(' Tier 2 failed, trying greedy band search...', error2.message);
                 this.parsingFlags.usedFallbacks.push('greedyBandSearch');
                 
                 try {
                     // Tier 3: Greedy band search
                     return await this.processFileGreedy(file);
                 } catch (error3) {
-                    console.warn('⚠️ Tier 3 failed, trying minimal mode...', error3.message);
+                    console.warn(' Tier 3 failed, trying minimal mode...', error3.message);
                     this.parsingFlags.usedFallbacks.push('minimalMode');
                     
                     // Tier 4: Minimal mode - last resort
@@ -2180,7 +2455,7 @@ class TransactionAnalyzer {
     }
 
     async processFileRelaxed(file) {
-        console.log('🔧 Relaxed mapper processing...');
+        console.log(' Relaxed mapper processing...');
         
         // Lower Levenshtein threshold, try synonym expansions
         const originalThreshold = 2;
@@ -2213,7 +2488,7 @@ class TransactionAnalyzer {
     }
 
     async processFileGreedy(file) {
-        console.log('🔍 Greedy band search processing...');
+        console.log(' Greedy band search processing...');
         
         // Test multiple row bands for table-like structure
         const transactions = await this.parseSpreadsheet(file);
@@ -2223,8 +2498,12 @@ class TransactionAnalyzer {
         }
         
         // Use the best result found
-        const meta = { fileName: file.name, sheetName: 'Sheet1' };
-        const accountType = this.detectAccountType(meta, transactions);
+        const meta = { 
+            fileName: file.name, 
+            sheetName: 'Sheet1',
+            columnNames: [] // Will be populated later if needed
+        };
+        const accountType = this.selectedAccountType || 'cash';
         const counts = this.countTransactions(transactions, accountType);
         
         this.parsingFlags.tableConfidence = this.calculateTableConfidence(transactions);
@@ -2234,7 +2513,7 @@ class TransactionAnalyzer {
     }
 
     async processFileMinimal(file) {
-        console.log('🚨 Minimal mode processing...');
+        console.log(' Minimal mode processing...');
         
         // Require only Date + (Amount or Debit/Credit)
         const transactions = await this.parseSpreadsheet(file);
@@ -2295,7 +2574,7 @@ class TransactionAnalyzer {
 
     // Enhanced error handling with recovery
     async processFileWithRecovery(file) {
-        console.log('🔄 Starting file processing with recovery...');
+        console.log(' Starting file processing with recovery...');
         
         try {
             const result = await this.processFileWithFailsafes(file);
@@ -2303,14 +2582,14 @@ class TransactionAnalyzer {
             // Perform quality checks
             const qualityWarnings = this.performQualityChecks(result.transactions, result.counts);
             if (qualityWarnings.length > 0) {
-                console.warn('⚠️ Quality check warnings:', qualityWarnings);
+                console.warn(' Quality check warnings:', qualityWarnings);
                 this.parsingFlags.usedFallbacks.push('qualityWarnings');
             }
             
             return result;
             
         } catch (error) {
-            console.error('❌ All processing tiers failed:', error);
+            console.error(' All processing tiers failed:', error);
             
             // Return minimal result to avoid complete failure
             return {
@@ -2323,7 +2602,7 @@ class TransactionAnalyzer {
 
     // Test Runner Methods
     async runTestSuite() {
-        console.log('🧪 Starting test suite...');
+        console.log(' Starting test suite...');
         
         if (typeof TransactionAnalyzerTests === 'undefined') {
             alert('Test framework not loaded. Please refresh the page and try again.');
@@ -2337,11 +2616,11 @@ class TransactionAnalyzer {
         const passed = testRunner.testResults.filter(r => r.passed).length;
         const total = testRunner.testResults.length;
         
-        alert(`Test Suite Complete!\n\n✅ Passed: ${passed}/${total}\n❌ Failed: ${total - passed}/${total}\n\nCheck console for detailed results.`);
+        alert(`Test Suite Complete!\n\n Passed: ${passed}/${total}\n Failed: ${total - passed}/${total}\n\nCheck console for detailed results.`);
     }
 
     async runPerformanceTest() {
-        console.log('⚡ Starting performance test...');
+        console.log(' Starting performance test...');
         
         if (typeof TransactionAnalyzerTests === 'undefined') {
             alert('Test framework not loaded. Please refresh the page and try again.');
@@ -2352,14 +2631,14 @@ class TransactionAnalyzer {
         const result = await testRunner.runPerformanceTests();
         
         if (result.success) {
-            alert(`Performance Test Complete!\n\n⏱️ Duration: ${result.duration.toFixed(2)}ms\n🚀 Rate: ${result.rate.toFixed(0)} transactions/second`);
+            alert(`Performance Test Complete!\n\n Duration: ${result.duration.toFixed(2)}ms\n Rate: ${result.rate.toFixed(0)} transactions/second`);
         } else {
-            alert(`Performance Test Failed!\n\n❌ Error: ${result.error}`);
+            alert(`Performance Test Failed!\n\n Error: ${result.error}`);
         }
     }
 
     generateSampleData() {
-        console.log('📄 Generating sample data...');
+        console.log(' Generating sample data...');
         
         // Create sample transaction data
         const sampleData = [
