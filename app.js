@@ -710,7 +710,7 @@ class TransactionAnalyzer {
                     <span class="detection-value">${this.transactions.length > 0 && this.transactions[0].type ? ' Detected' : ' Auto-detected from amounts'}</span>
                 </div>
             </div>
-            <p class="detection-note">The analyzer automatically found and mapped your spreadsheet columns.</p>
+            <p class="detection-note">The analyzer automatically found and mapped your spreadsheet columns using ${this.columnMapping && this.columnMapping.headerRow === -1 ? 'pattern-based detection' : 'header row detection'}.</p>
         `;
         
         // Insert before the summary section
@@ -1682,9 +1682,13 @@ class TransactionAnalyzer {
                 throw new Error('Could not find required columns');
             }
             
+            // Store column mapping for display purposes
+            this.columnMapping = columnMapping;
+            
             // Step 3: Data extraction with row integrity
             const transactions = [];
-            for (let i = columnMapping.headerRow + 1; i < lines.length; i++) {
+            const startRow = columnMapping.headerRow === -1 ? 0 : columnMapping.headerRow + 1;
+            for (let i = startRow; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
                 
@@ -1791,8 +1795,169 @@ class TransactionAnalyzer {
             }
         }
         
-        console.log(' No valid header row found');
+        console.log(' No valid header row found - trying pattern-based detection');
+        
+        // Try pattern-based column detection for Wells Fargo-style data
+        const patternMapping = this.detectColumnsByPattern(lines);
+        if (patternMapping) {
+            console.log(' Found columns using pattern detection:', patternMapping);
+            console.log(' Using pattern-based detection for Wells Fargo-style data');
+            return patternMapping;
+        }
+        
         throw new Error('No valid transaction data found. Please ensure your file contains:\n• A header row with "Date" and "Amount" columns\n• At least one row of transaction data\n• Proper date formats (MM/DD/YYYY, etc.)\n• Numeric amounts');
+    }
+
+    detectColumnsByPattern(lines) {
+        console.log(' Attempting pattern-based column detection...');
+        
+        // Analyze the first 20 rows to find patterns
+        const sampleRows = [];
+        for (let i = 0; i < Math.min(20, lines.length); i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            const row = this.parseCSVLine(line);
+            if (row.length >= 3) { // Need at least 3 columns
+                sampleRows.push(row);
+            }
+        }
+        
+        if (sampleRows.length < 3) {
+            console.log(' Insufficient sample data for pattern detection');
+            return null;
+        }
+        
+        console.log(` Analyzing ${sampleRows.length} sample rows for patterns`);
+        
+        // Analyze each column to determine its likely purpose
+        const columnCount = Math.max(...sampleRows.map(row => row.length));
+        const columnAnalysis = [];
+        
+        for (let colIndex = 0; colIndex < columnCount; colIndex++) {
+            const columnData = sampleRows.map(row => row[colIndex] || '').filter(cell => cell.trim());
+            
+            if (columnData.length === 0) continue;
+            
+            const analysis = this.analyzeColumnPattern(columnData, colIndex);
+            columnAnalysis.push(analysis);
+            
+            console.log(` Column ${colIndex}: ${analysis.type} (confidence: ${analysis.confidence})`);
+        }
+        
+        // Find the best matches for each required column type
+        const dateIndex = this.findBestColumnMatch(columnAnalysis, 'date');
+        const amountIndex = this.findBestColumnMatch(columnAnalysis, 'amount');
+        const descriptionIndex = this.findBestColumnMatch(columnAnalysis, 'description');
+        const typeIndex = this.findBestColumnMatch(columnAnalysis, 'type');
+        
+        if (dateIndex === -1 || amountIndex === -1) {
+            console.log(' Could not identify required date and amount columns');
+            return null;
+        }
+        
+        console.log(` Pattern detection results: date=${dateIndex}, amount=${amountIndex}, description=${descriptionIndex}, type=${typeIndex}`);
+        console.log(' Pattern-based detection successful for Wells Fargo-style data');
+        
+        return {
+            headerRow: -1, // No header row
+            dateIndex: dateIndex,
+            descriptionIndex: descriptionIndex,
+            amountIndex: amountIndex,
+            typeIndex: typeIndex
+        };
+    }
+
+    analyzeColumnPattern(columnData, columnIndex) {
+        const analysis = {
+            columnIndex: columnIndex,
+            type: 'unknown',
+            confidence: 0,
+            sampleValues: columnData.slice(0, 3)
+        };
+        
+        // Check for date patterns (including M/DD/YYYY)
+        const datePatterns = [
+            /^\d{1,2}\/\d{1,2}\/\d{4}$/, // M/DD/YYYY or MM/DD/YYYY
+            /^\d{4}-\d{1,2}-\d{1,2}$/, // YYYY-MM-DD
+            /^\d{1,2}-\d{1,2}-\d{4}$/, // MM-DD-YYYY
+            /^\d{1,2}\.\d{1,2}\.\d{4}$/ // MM.DD.YYYY
+        ];
+        
+        const dateMatches = columnData.filter(cell => 
+            datePatterns.some(pattern => pattern.test(cell.trim()))
+        );
+        
+        if (dateMatches.length > 0) {
+            analysis.type = 'date';
+            analysis.confidence = dateMatches.length / columnData.length;
+            return analysis;
+        }
+        
+        // Check for amount patterns
+        const amountPatterns = [
+            /^[+-]?\d+\.?\d*$/, // Simple number
+            /^[+-]?\$?\d+\.?\d*$/, // With dollar sign
+            /^[+-]?\d+,\d{3}(\.\d{2})?$/, // With thousands separator
+            /^[+-]?\d+\.\d{2}$/ // Decimal with exactly 2 places
+        ];
+        
+        const amountMatches = columnData.filter(cell => {
+            const trimmed = cell.trim();
+            return amountPatterns.some(pattern => pattern.test(trimmed)) &&
+                   this.isValidAmount(trimmed);
+        });
+        
+        if (amountMatches.length > 0) {
+            analysis.type = 'amount';
+            analysis.confidence = amountMatches.length / columnData.length;
+            return analysis;
+        }
+        
+        // Check for description patterns (longer text, not numbers)
+        const descriptionMatches = columnData.filter(cell => {
+            const trimmed = cell.trim();
+            return trimmed.length > 5 && 
+                   !/^\d+\.?\d*$/.test(trimmed) && 
+                   !amountPatterns.some(pattern => pattern.test(trimmed));
+        });
+        
+        if (descriptionMatches.length > 0) {
+            analysis.type = 'description';
+            analysis.confidence = descriptionMatches.length / columnData.length;
+            return analysis;
+        }
+        
+        // Check for type patterns (short categorical values)
+        const typeMatches = columnData.filter(cell => {
+            const trimmed = cell.trim();
+            return trimmed.length <= 20 && 
+                   trimmed.length > 0 &&
+                   !/^\d+\.?\d*$/.test(trimmed);
+        });
+        
+        if (typeMatches.length > 0) {
+            analysis.type = 'type';
+            analysis.confidence = typeMatches.length / columnData.length;
+            return analysis;
+        }
+        
+        return analysis;
+    }
+
+    findBestColumnMatch(columnAnalysis, targetType) {
+        const candidates = columnAnalysis.filter(analysis => analysis.type === targetType);
+        
+        if (candidates.length === 0) {
+            return -1;
+        }
+        
+        // Return the column with highest confidence
+        const bestMatch = candidates.reduce((best, current) => 
+            current.confidence > best.confidence ? current : best
+        );
+        
+        return bestMatch.columnIndex;
     }
 
     findColumnIndexFuzzy(headers, possibleNames) {
@@ -1949,7 +2114,7 @@ class TransactionAnalyzer {
                     month = parseInt(parts[1]);
                     day = parseInt(parts[2]);
                 } else {
-                    // MM/DD/YYYY, MM-DD-YYYY, or MM.DD.YYYY format
+                    // MM/DD/YYYY, M/DD/YYYY, MM-DD-YYYY, or MM.DD.YYYY format
                     month = parseInt(parts[0]);
                     day = parseInt(parts[1]);
                     year = parseInt(parts[2]);
