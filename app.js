@@ -967,7 +967,7 @@ class TransactionAnalyzer {
         const overallTotals = this.calculateOverallTotals();
         const overallTotalsRow = document.createElement('tr');
         overallTotalsRow.style.fontWeight = 'bold';
-        overallTotalsRow.style.backgroundColor = '#007bff';
+        overallTotalsRow.style.backgroundColor = '#473827';
         overallTotalsRow.style.color = 'white';
         
         const grandTotal = overallTotals.debits.count + overallTotals.credits.count + overallTotals.checks.count;
