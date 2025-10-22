@@ -107,6 +107,12 @@ class TransactionAnalyzer {
             backToQuestionsBtn.addEventListener('click', this.backToQuestions.bind(this));
         }
 
+        // Download table button
+        const downloadTableBtn = document.getElementById('downloadTableBtn');
+        if (downloadTableBtn) {
+            downloadTableBtn.addEventListener('click', this.downloadTableAsImage.bind(this));
+        }
+
         // File upload events
         uploadArea.addEventListener('click', () => fileInput.click());
         uploadArea.addEventListener('dragover', this.handleDragOver.bind(this));
@@ -640,11 +646,24 @@ class TransactionAnalyzer {
                     </table>
                 </div>
 
-                <button class="reset-btn" id="resetBtn">Analyze Another Statement</button>
+                <div class="action-buttons" style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+                    <button class="download-table-btn" id="downloadTableBtn" style="background-color: #887D71; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer;">Download Table as Image</button>
+                    <button class="reset-btn" id="resetBtn">Analyze Another Statement</button>
+                </div>
             `;
             
             // Re-attach event listeners
             this.attachEventListeners();
+            
+            // Debug: Check if download button exists
+            setTimeout(() => {
+                const downloadBtn = document.getElementById('downloadTableBtn');
+                console.log('Download button found:', downloadBtn);
+                if (downloadBtn) {
+                    console.log('Download button is visible:', downloadBtn.offsetParent !== null);
+                    console.log('Download button parent:', downloadBtn.parentElement);
+                }
+            }, 100);
             
             this.displayColumnDetection();
             this.displayParsingConfidence();
@@ -1174,6 +1193,12 @@ class TransactionAnalyzer {
             resetBtn.addEventListener('click', this.reset.bind(this));
         }
 
+        // Download table button
+        const downloadTableBtn = document.getElementById('downloadTableBtn');
+        if (downloadTableBtn) {
+            downloadTableBtn.addEventListener('click', this.downloadTableAsImage.bind(this));
+        }
+
         // Toggle details button
         if (toggleDetailsBtn) {
             toggleDetailsBtn.addEventListener('click', this.toggleDetails.bind(this));
@@ -1465,6 +1490,144 @@ class TransactionAnalyzer {
         }
         
         console.log('Returned to account information section');
+    }
+
+    async downloadTableAsImage() {
+        try {
+            const table = document.getElementById('summaryTable');
+            if (!table) {
+                alert('No table found to download');
+                return;
+            }
+
+            console.log('html2canvas available:', typeof html2canvas);
+            console.log('window.html2canvas:', typeof window.html2canvas);
+            
+            // Check if html2canvas is available globally
+            if (typeof html2canvas !== 'undefined') {
+                // Use the global html2canvas function
+                const canvas = await html2canvas(table, {
+                    scale: 2,
+                    backgroundColor: '#ffffff',
+                    useCORS: true,
+                    allowTaint: true
+                });
+                
+                // Convert canvas to image and download
+                const link = document.createElement('a');
+                link.download = `transaction-table-${new Date().toISOString().split('T')[0]}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+            } else {
+                // Fallback: create a simple table representation
+                this.createSimpleTableImage(table);
+            }
+            
+        } catch (error) {
+            console.error('Error downloading table:', error);
+            alert('Error downloading table. Please try again.');
+        }
+    }
+
+    createSimpleTableImage(table) {
+        // Create a simple canvas representation of the table
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Get table dimensions
+        const rect = table.getBoundingClientRect();
+        const scale = 2;
+        
+        canvas.width = rect.width * scale;
+        canvas.height = rect.height * scale;
+        
+        // Set canvas background to white
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Set font
+        ctx.font = '14px Arial';
+        ctx.fillStyle = '#000000';
+        
+        // Get table data
+        const rows = table.querySelectorAll('tr');
+        const cellHeight = 30;
+        const startY = 20;
+        
+        rows.forEach((row, rowIndex) => {
+            const cells = row.querySelectorAll('th, td');
+            const cellWidth = canvas.width / cells.length;
+            
+            cells.forEach((cell, cellIndex) => {
+                const x = cellIndex * cellWidth + 10;
+                const y = rowIndex * cellHeight + startY;
+                
+                // Draw cell background
+                if (rowIndex === 0) {
+                    ctx.fillStyle = '#473827';
+                    ctx.fillRect(cellIndex * cellWidth, rowIndex * cellHeight + startY - 15, cellWidth, cellHeight);
+                    ctx.fillStyle = '#ffffff';
+                } else {
+                    ctx.fillStyle = '#ffffff';
+                }
+                
+                // Draw cell text
+                ctx.fillStyle = rowIndex === 0 ? '#ffffff' : '#000000';
+                ctx.fillText(cell.textContent.trim(), x, y);
+            });
+        });
+        
+        // Convert canvas to image and download
+        const link = document.createElement('a');
+        link.download = `transaction-table-${new Date().toISOString().split('T')[0]}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    }
+
+    drawTableOnCanvas(ctx, table, width, height) {
+        const rows = table.querySelectorAll('tr');
+        const cellHeight = height / rows.length;
+        let y = 0;
+        
+        rows.forEach((row, rowIndex) => {
+            const cells = row.querySelectorAll('th, td');
+            const cellWidth = width / cells.length;
+            let x = 0;
+            
+            cells.forEach((cell, cellIndex) => {
+                // Draw cell background
+                if (rowIndex === 0) {
+                    ctx.fillStyle = '#BCB2A1'; // Header background
+                } else if (rowIndex === rows.length - 1) {
+                    ctx.fillStyle = '#473827'; // Total row background
+                } else {
+                    ctx.fillStyle = '#ffffff'; // Regular cell background
+                }
+                ctx.fillRect(x, y, cellWidth, cellHeight);
+                
+                // Draw cell border
+                ctx.strokeStyle = '#887D71';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, cellWidth, cellHeight);
+                
+                // Draw cell text
+                ctx.fillStyle = rowIndex === rows.length - 1 ? '#ffffff' : '#473827';
+                ctx.font = '14px Libre Baskerville, serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                const text = cell.textContent.trim();
+                const textX = x + cellWidth / 2;
+                const textY = y + cellHeight / 2;
+                
+                ctx.fillText(text, textX, textY);
+                
+                x += cellWidth;
+            });
+            
+            y += cellHeight;
+        });
     }
 
     // RowGuard System for Row Integrity

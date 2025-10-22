@@ -9,15 +9,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css?v=3">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js?v=1"></script>
     <script src="test-fixtures.js?v=2"></script>
 </head>
 <body>
+    <div class="logo-container">
+        <img src="Logo File - Full.png" alt="Logo" class="logo">
+    </div>
+    
     <div class="container">
         <header>
-            <div class="header-content">
-                <img src="Logo File - Full.png" alt="Logo" class="logo">
-                <h1>Transaction Count Analyzer</h1>
-            </div>
+            <h1>Transaction Count Analyzer</h1>
         </header>
 
         <main>
@@ -210,7 +212,10 @@
                     </table>
                 </div>
 
-                <button class="reset-btn" id="resetBtn">Analyze Another Statement</button>
+                <div class="action-buttons">
+                    <button class="download-table-btn" id="downloadTableBtn">Download Table as Image</button>
+                    <button class="reset-btn" id="resetBtn">Analyze Another Statement</button>
+                </div>
             </section>
         </main>
     </div>
