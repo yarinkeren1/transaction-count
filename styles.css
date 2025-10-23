@@ -624,7 +624,7 @@ header p {
 
 /* Download Table Button */
 .download-table-btn {
-    background-color: #887D71;
+    background-color: #473827;
     color: white;
     border: none;
     padding: 12px 24px;
@@ -632,13 +632,13 @@ header p {
     font-size: 1rem;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(136, 125, 113, 0.3);
+    box-shadow: 0 4px 15px rgba(71, 56, 39, 0.3);
 }
 
 .download-table-btn:hover {
-    background-color: #473827;
+    background-color: #2d1f15;
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(71, 56, 39, 0.4);
+    box-shadow: 0 6px 20px rgba(45, 31, 21, 0.4);
 }
 
 /* Reset Button */
@@ -800,6 +800,27 @@ header p {
 /* Monthly breakdown styling */
 .summary-table tr:nth-child(even) {
     background-color: #f8f9fa;
+}
+
+/* Transaction type color coding for credit cards */
+.type-charges {
+    color: #dc3545 !important;
+    font-weight: 600;
+}
+
+.type-payments {
+    color: #28a745 !important;
+    font-weight: 600;
+}
+
+.type-credits {
+    color: #28a745 !important;
+    font-weight: 600;
+}
+
+.type-debits {
+    color: #dc3545 !important;
+    font-weight: 600;
 }
 
 .summary-table tr:hover {

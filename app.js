@@ -627,9 +627,10 @@ class TransactionAnalyzer {
                         <input type="text" id="searchInput" placeholder="Search transactions..." class="search-input">
                         <select id="typeFilter" class="type-filter">
                             <option value="">All Types</option>
-                            <option value="checks">Checks</option>
-                            <option value="debits">Debits</option>
-                            <option value="credits">Credits</option>
+                            ${this.selectedAccountType === 'credit-card' ? 
+                                '<option value="charges">Charge</option><option value="payments">Payment</option>' :
+                                '<option value="checks">Checks</option><option value="debits">Debits</option><option value="credits">Credits</option>'
+                            }
                         </select>
                     </div>
                     <table class="transactions-table" id="transactionsTable">
@@ -646,8 +647,8 @@ class TransactionAnalyzer {
                     </table>
                 </div>
 
-                <div class="action-buttons" style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
-                    <button class="download-table-btn" id="downloadTableBtn" style="background-color: #887D71; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer;">Download Table as Image</button>
+                <div class="action-buttons">
+                    <button class="download-table-btn" id="downloadTableBtn">Download Table as Image</button>
                     <button class="reset-btn" id="resetBtn">Analyze Another Statement</button>
                 </div>
             `;
@@ -1023,7 +1024,7 @@ class TransactionAnalyzer {
                 <td>${transaction.date.toLocaleDateString()}</td>
                 <td>${transaction.description}</td>
                 <td class="${transaction.amount >= 0 ? 'amount-positive' : 'amount-negative'}">$${Math.abs(transaction.amount).toFixed(2)}</td>
-                <td class="type-${transaction.type}">${this.capitalizeFirst(transaction.type)}</td>
+                <td class="type-${transaction.type}">${this.getDisplayTransactionType(transaction.type)}</td>
             `;
             transactionsTableBody.appendChild(row);
         });
@@ -1328,8 +1329,8 @@ class TransactionAnalyzer {
                 // Show details
                 transactionsSection.style.display = 'block';
                 toggleBtn.textContent = ' Hide Detailed Transactions';
-                toggleBtn.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
-                toggleBtn.style.boxShadow = '0 4px 15px rgba(231, 76, 60, 0.3)';
+                toggleBtn.style.background = '#887D71';
+                toggleBtn.style.boxShadow = '0 4px 15px rgba(136, 125, 113, 0.3)';
                 
                 // Populate the transactions table if not already done
                 if (document.getElementById('transactionsTableBody').children.length === 0) {
@@ -1339,14 +1340,32 @@ class TransactionAnalyzer {
                 // Hide details
                 transactionsSection.style.display = 'none';
                 toggleBtn.textContent = ' View Detailed Transactions';
-                toggleBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                toggleBtn.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.3)';
+                toggleBtn.style.background = '#473827';
+                toggleBtn.style.boxShadow = '0 4px 15px rgba(71, 56, 39, 0.3)';
             }
         }
     }
 
     capitalizeFirst(str) {
         return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    getDisplayTransactionType(transactionType) {
+        // For credit card accounts, map transaction types to appropriate display names
+        if (this.selectedAccountType === 'credit-card') {
+            const typeMapping = {
+                'credits': 'Payment',
+                'debits': 'Charge',
+                'checks': 'Charge', // Checks are treated as charges for credit cards
+                'payments': 'Payment',
+                'charges': 'Charge',
+                'refunds': 'Payment'
+            };
+            return typeMapping[transactionType.toLowerCase()] || this.capitalizeFirst(transactionType);
+        }
+        
+        // For cash accounts, use the original mapping
+        return this.capitalizeFirst(transactionType);
     }
 
     // Bank Selection Methods
