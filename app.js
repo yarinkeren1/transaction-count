@@ -113,6 +113,12 @@ class TransactionAnalyzer {
             downloadTableBtn.addEventListener('click', this.downloadTableAsImage.bind(this));
         }
 
+        // Download spreadsheet button
+        const downloadSpreadsheetBtn = document.getElementById('downloadTableSpreadsheetBtn');
+        if (downloadSpreadsheetBtn) {
+            downloadSpreadsheetBtn.addEventListener('click', this.downloadTableAsSpreadsheet.bind(this));
+        }
+
         // File upload events
         uploadArea.addEventListener('click', () => fileInput.click());
         uploadArea.addEventListener('dragover', this.handleDragOver.bind(this));
@@ -649,6 +655,7 @@ class TransactionAnalyzer {
 
                 <div class="action-buttons">
                     <button class="download-table-btn" id="downloadTableBtn">Download Table as Image</button>
+                    <button class="download-table-btn" id="downloadTableSpreadsheetBtn">Download Table as Spreadsheet</button>
                     <button class="reset-btn" id="resetBtn">Analyze Another Statement</button>
                 </div>
             `;
@@ -1012,6 +1019,56 @@ class TransactionAnalyzer {
         }
         
         summaryTableBody.appendChild(overallTotalsRow);
+        
+        // Add average row
+        this.addAverageRow(summaryTableBody, monthlyData, months);
+    }
+
+    addAverageRow(summaryTableBody, monthlyData, months) {
+        if (months.length === 0) return;
+        
+        const averageRow = document.createElement('tr');
+        averageRow.style.fontWeight = 'bold';
+        averageRow.style.backgroundColor = '#BCB2A1';
+        averageRow.style.color = '#473827';
+        
+        // Calculate averages across all months
+        const totalMonths = months.length;
+        let avgDebits = 0, avgCredits = 0, avgChecks = 0, avgTotal = 0;
+        
+        months.forEach(month => {
+            const monthData = monthlyData[month];
+            avgDebits += monthData.debits.count;
+            avgCredits += monthData.credits.count;
+            avgChecks += monthData.checks.count;
+            avgTotal += (monthData.debits.count + monthData.credits.count + monthData.checks.count);
+        });
+        
+        avgDebits = Math.round(avgDebits / totalMonths);
+        avgCredits = Math.round(avgCredits / totalMonths);
+        avgChecks = Math.round(avgChecks / totalMonths);
+        avgTotal = Math.round(avgTotal / totalMonths);
+        
+        if (this.selectedAccountType === 'credit-card') {
+            // Credit card averages
+            averageRow.innerHTML = `
+                <td>AVERAGE</td>
+                <td>${avgDebits}</td>
+                <td>${avgCredits}</td>
+                <td>${avgTotal}</td>
+            `;
+        } else {
+            // Cash account averages
+            averageRow.innerHTML = `
+                <td>AVERAGE</td>
+                <td>${avgDebits}</td>
+                <td>${avgCredits}</td>
+                <td>${avgChecks}</td>
+                <td>${avgTotal}</td>
+            `;
+        }
+        
+        summaryTableBody.appendChild(averageRow);
     }
 
     displayTransactions() {
@@ -1198,6 +1255,12 @@ class TransactionAnalyzer {
         const downloadTableBtn = document.getElementById('downloadTableBtn');
         if (downloadTableBtn) {
             downloadTableBtn.addEventListener('click', this.downloadTableAsImage.bind(this));
+        }
+
+        // Download spreadsheet button
+        const downloadSpreadsheetBtn = document.getElementById('downloadTableSpreadsheetBtn');
+        if (downloadSpreadsheetBtn) {
+            downloadSpreadsheetBtn.addEventListener('click', this.downloadTableAsSpreadsheet.bind(this));
         }
 
         // Toggle details button
@@ -1602,6 +1665,60 @@ class TransactionAnalyzer {
         link.download = `transaction-table-${new Date().toISOString().split('T')[0]}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
+    }
+
+    downloadTableAsSpreadsheet() {
+        try {
+            const table = document.getElementById('summaryTable');
+            if (!table) {
+                alert('No table found to download');
+                return;
+            }
+
+            // Get all rows from the table
+            const rows = table.querySelectorAll('tr');
+            const csvData = [];
+
+            rows.forEach((row) => {
+                const rowData = [];
+                const cells = row.querySelectorAll('th, td');
+                
+                cells.forEach((cell) => {
+                    // Clean the cell text and handle special characters
+                    let cellText = cell.textContent.trim();
+                    // Escape quotes and wrap in quotes if contains comma or newline
+                    if (cellText.includes(',') || cellText.includes('\n') || cellText.includes('"')) {
+                        cellText = '"' + cellText.replace(/"/g, '""') + '"';
+                    }
+                    rowData.push(cellText);
+                });
+                
+                csvData.push(rowData.join(','));
+            });
+
+            // Create CSV content
+            const csvContent = csvData.join('\n');
+            
+            // Create blob and download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `transaction-table-${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Clean up
+            URL.revokeObjectURL(url);
+            
+        } catch (error) {
+            console.error('Error downloading spreadsheet:', error);
+            alert('Error downloading spreadsheet. Please try again.');
+        }
     }
 
     drawTableOnCanvas(ctx, table, width, height) {
