@@ -2394,33 +2394,70 @@ class TransactionAnalyzer {
     }
 
     determineTransactionTypeSafe(row, columnMapping, amount) {
+        // Get description for better detection
+        const description = columnMapping.descriptionIndex !== -1 ? 
+            (row[columnMapping.descriptionIndex] || '').toLowerCase() : '';
+        
         // Check explicit type column first
         if (columnMapping.typeIndex !== -1 && row[columnMapping.typeIndex] !== undefined) {
             const typeStr = String(row[columnMapping.typeIndex]).toLowerCase();
-            if (typeStr.includes('credit') || typeStr.includes('deposit') || typeStr.includes('payment')) {
+            
+            // Credit card indicators
+            if (typeStr.includes('payment') || typeStr.includes('pay') || 
+                /\bthank you\b/i.test(typeStr)) {
+                return 'credits'; // Payments are credits for credit cards
+            }
+            if (typeStr.includes('charge') || typeStr.includes('purchase') || 
+                typeStr.includes('debit') || typeStr.includes('fee')) {
+                return 'debits'; // Charges are debits for credit cards
+            }
+            if (typeStr.includes('refund') || typeStr.includes('return')) {
+                return 'credits'; // Refunds are credits
+            }
+            
+            // Cash account indicators
+            if (typeStr.includes('credit') || typeStr.includes('deposit')) {
                 return 'credits';
-            } else if (typeStr.includes('check')) {
+            }
+            if (typeStr.includes('check')) {
                 return 'checks';
-            } else if (typeStr.includes('debit') || typeStr.includes('purchase') || typeStr.includes('withdrawal')) {
+            }
+            if (typeStr.includes('debit') || typeStr.includes('withdrawal')) {
                 return 'debits';
             }
         }
         
-        // Auto-detect based on amount and description
-        const description = columnMapping.descriptionIndex !== -1 ? 
-            row[columnMapping.descriptionIndex].toLowerCase() : '';
+        // Check description for credit card patterns
+        const fullText = `${description} ${row[columnMapping.typeIndex] || ''}`.toLowerCase();
+        
+        // Payment indicators (for credit cards, these are credits)
+        if (/\b(payment|auto\s*pay|thank you|bill ?pay|pay\s*from|payment received)\b/i.test(fullText)) {
+            return 'credits';
+        }
+        
+        // Refund/return indicators (for credit cards, these are credits)
+        if (/\b(refund|return|reversal|credit issued)\b/i.test(fullText)) {
+            return 'credits';
+        }
+        
+        // Charge/purchase indicators (for credit cards, these are debits)
+        if (/\b(purchase|charge|fee|interest|finance charge|debit)\b/i.test(fullText)) {
+            return 'debits';
+        }
         
         // Check for check indicators
         if (this.isCheckTransaction(description, row, columnMapping)) {
             return 'checks';
         }
         
-        // Amount-based detection (cash convention)
-        // Negative amounts are debits (money out), positive are credits (money in)
+        // Amount-based detection
+        // For credit cards: negative = charges (debits), positive = payments/credits
+        // For cash: negative = debits, positive = credits
+        // We'll use the same logic for both since the display will map correctly
         if (amount < 0) {
-            return 'debits';
+            return 'debits'; // Negative = money out/owed (charges for credit cards, debits for cash)
         } else {
-            return 'credits';
+            return 'credits'; // Positive = money in/paid (payments for credit cards, credits for cash)
         }
     }
 
@@ -2646,26 +2683,39 @@ class TransactionAnalyzer {
         for (const t of uniqueTransactions) {
             const text = `${t.description || ''} ${t.type || ''}`.toLowerCase();
             const amount = t.amount;
+            const absAmount = Math.abs(amount);
             
-            // Payment detection
-            if (/\b(payments?|auto\s*pay|thank you|bill ?pay)\b/i.test(text)) {
+            // Payment detection - payments are typically positive amounts with payment keywords
+            // OR explicitly marked as payment/credit transactions
+            if (/\b(payment|auto\s*pay|thank you|bill ?pay|pay\s*from|payment received)\b/i.test(text) ||
+                (t.type && /credit|payment/i.test(t.type))) {
                 payments++;
                 continue;
             }
             
-            // Refund detection
-            if (/\b(refund|return|reversal|credit issued)\b/i.test(text) || 
-                (amount > 0 && /\bcredits?\b/.test(text))) {
+            // Refund detection - refunds are credits/returns
+            if (/\b(refund|return|reversal|credit issued|credit adjustment)\b/i.test(text) ||
+                (t.type && /refund|return/i.test(t.type))) {
                 refunds++;
                 continue;
             }
             
-            // Charge detection
-            if (amount < 0 || 
-                /\b(purchase|charge|fee|interest|finance charge)\b/i.test(text) || 
-                /\bpurchases?\b/i.test(text)) {
+            // Charge detection - purchases, fees, and spending
+            // Negative amounts are typically charges (money spent/increase in debt)
+            // Positive amounts with charge keywords are also charges
+            if (/\b(purchase|charge|fee|interest|finance charge|debit|withdrawal)\b/i.test(text) ||
+                (t.type && /debit|charge|purchase/i.test(t.type)) ||
+                (amount < 0 && !/\b(payment|refund|return|credit)\b/i.test(text))) {
                 charges++;
                 continue;
+            }
+            
+            // Fallback: if amount is positive and no payment keywords, it might be a payment
+            // If amount is negative, it's likely a charge
+            if (amount > 0) {
+                payments++; // Default positive to payment
+            } else {
+                charges++; // Default negative to charge
             }
         }
         
