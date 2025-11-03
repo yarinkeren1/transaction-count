@@ -2398,6 +2398,13 @@ class TransactionAnalyzer {
         const description = columnMapping.descriptionIndex !== -1 ? 
             (row[columnMapping.descriptionIndex] || '').toLowerCase() : '';
         
+        // Get original description (before lowercasing) for pattern matching
+        const originalDescription = columnMapping.descriptionIndex !== -1 ? 
+            (row[columnMapping.descriptionIndex] || '') : '';
+        
+        // Check if this is a credit card account
+        const isCreditCard = this.selectedAccountType === 'credit-card';
+        
         // Check explicit type column first
         if (columnMapping.typeIndex !== -1 && row[columnMapping.typeIndex] !== undefined) {
             const typeStr = String(row[columnMapping.typeIndex]).toLowerCase();
@@ -2431,33 +2438,44 @@ class TransactionAnalyzer {
         const fullText = `${description} ${row[columnMapping.typeIndex] || ''}`.toLowerCase();
         
         // Payment indicators (for credit cards, these are credits)
-        if (/\b(payment|auto\s*pay|thank you|bill ?pay|pay\s*from|payment received)\b/i.test(fullText)) {
+        // Must be explicit - only count if clearly marked as payment
+        if (/\b(payment|auto\s*pay|thank you|bill ?pay|pay\s*from|payment received|online payment|electronic payment|payment to|pay\s+to)\b/i.test(fullText)) {
             return 'credits';
         }
         
         // Refund/return indicators (for credit cards, these are credits)
-        if (/\b(refund|return|reversal|credit issued)\b/i.test(fullText)) {
+        if (/\b(refund|return|reversal|credit issued|credit adjustment|refunded)\b/i.test(fullText)) {
             return 'credits';
         }
         
-        // Charge/purchase indicators (for credit cards, these are debits)
-        if (/\b(purchase|charge|fee|interest|finance charge|debit)\b/i.test(fullText)) {
-            return 'debits';
-        }
-        
-        // Check for check indicators
+        // Check for check indicators (cash accounts)
         if (this.isCheckTransaction(description, row, columnMapping)) {
             return 'checks';
         }
         
-        // Amount-based detection
-        // For credit cards: negative = charges (debits), positive = payments/credits
-        // For cash: negative = debits, positive = credits
-        // We'll use the same logic for both since the display will map correctly
+        // For credit cards: default ALL transactions to charges unless explicitly marked as payment
+        // This is because on credit cards, purchases/charges are the vast majority of transactions
+        // Payments are much less frequent and are usually explicitly labeled
+        if (isCreditCard) {
+            // For credit cards: if it doesn't explicitly say "payment", it's a charge
+            // Negative amounts are charges (money spent)
+            // Positive amounts are also charges (purchases shown as positive)
+            // Only payments explicitly marked should be credits
+            if (amount < 0) {
+                return 'debits'; // Negative = charges (money spent/increase in debt)
+            } else {
+                // Positive amount: default to charge
+                // The only way it becomes a payment is if it explicitly says so (already checked above)
+                return 'debits'; // Default all to charge for credit cards
+            }
+        }
+        
+        // For cash accounts: use traditional logic
+        // Negative amounts are debits (money out), positive are credits (money in)
         if (amount < 0) {
-            return 'debits'; // Negative = money out/owed (charges for credit cards, debits for cash)
+            return 'debits';
         } else {
-            return 'credits'; // Positive = money in/paid (payments for credit cards, credits for cash)
+            return 'credits';
         }
     }
 
