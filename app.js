@@ -2415,11 +2415,12 @@ class TransactionAnalyzer {
             return 'checks';
         }
         
-        // Amount-based detection
+        // Amount-based detection (cash convention)
+        // Negative amounts are debits (money out), positive are credits (money in)
         if (amount < 0) {
-            return 'credits';
-        } else {
             return 'debits';
+        } else {
+            return 'credits';
         }
     }
 
